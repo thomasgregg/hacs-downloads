@@ -51,7 +51,7 @@ a { color: inherit; text-decoration: none; }
   background: rgb(255 255 255 / 78%);
   border: 1px solid var(--line);
   border-radius: 999px;
-  color: var(--muted);
+  color: var(--ink);
   display: flex;
   flex: 0 0 164px;
   gap: 7px;
@@ -70,7 +70,7 @@ a { color: inherit; text-decoration: none; }
   cursor: pointer;
   font: inherit;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 650;
   height: 100%;
   min-width: 0;
   outline: 0;
@@ -81,7 +81,7 @@ a { color: inherit; text-decoration: none; }
 .selector-chevron { pointer-events: none; position: absolute; right: 9px; }
 .live-pill, .asset-pill {
   align-items: center;
-  background: rgb(255 255 255 / 75%);
+  background: rgb(255 255 255 / 78%);
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
@@ -94,9 +94,9 @@ a { color: inherit; text-decoration: none; }
 .live-pill i { background: var(--teal); border-radius: 50%; box-shadow: 0 0 0 4px rgb(25 198 173 / 14%); height: 7px; width: 7px; }
 .live-pill.status-loading i { animation: pulse 1.2s ease-in-out infinite; }
 .live-pill.status-stale i, .live-pill.status-limited i { background: #efaa54; box-shadow: 0 0 0 4px rgb(239 170 84 / 14%); }
-.live-pill { flex: 0 0 140px; height: 36px; justify-content: center; width: 140px; }
-.github-button { align-items: center; background: var(--ink); border-radius: 999px; color: white; display: inline-flex; font-size: 11px; font-weight: 650; gap: 7px; height: 36px; padding: 0 14px; transition: box-shadow .18s ease; }
-.github-button:hover { box-shadow: 0 10px 22px rgb(16 37 63 / 18%); }
+.live-pill { color: var(--ink); flex: 0 0 140px; height: 36px; justify-content: center; width: 140px; }
+.github-button { align-items: center; background: rgb(255 255 255 / 78%); border: 1px solid var(--line); border-radius: 999px; color: var(--ink); display: inline-flex; font-size: 11px; font-weight: 650; gap: 7px; height: 36px; padding: 0 14px; transition: background .18s ease, box-shadow .18s ease; }
+.github-button:hover { background: white; box-shadow: 0 10px 22px rgb(16 37 63 / 10%); }
 
 .hero { align-items: end; display: flex; justify-content: space-between; padding: 68px 0 44px; }
 .eyebrow { align-items: center; color: var(--teal-dark); display: flex; font-size: 10px; font-weight: 800; gap: 7px; letter-spacing: .13em; margin: 0 0 14px; text-transform: uppercase; }
