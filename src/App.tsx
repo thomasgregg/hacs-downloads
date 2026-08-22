@@ -78,6 +78,8 @@ const PROJECTS: readonly ProjectConfig[] = [
 
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
 const LAST_PROJECT_KEY = 'hacs-downloads-selected-project-v1';
+const RATE_LIMIT_RESET_KEY = 'hacs-downloads-rate-limit-reset-v1';
+const REFRESH_INTERVAL_MS = 300_000;
 
 function getProject(projectId: string) {
   return PROJECTS.find((candidate) => candidate.id === projectId) ?? PROJECTS[0];
@@ -97,6 +99,17 @@ function getInitialProjectId() {
 
 function snapshotCacheKey(projectId: string) {
   return `hacs-downloads-snapshot-${projectId}-v1`;
+}
+
+function readRateLimitReset(): number | null {
+  try {
+    const resetAt = Number(window.localStorage.getItem(RATE_LIMIT_RESET_KEY));
+    if (Number.isFinite(resetAt) && resetAt > Date.now()) return resetAt;
+    window.localStorage.removeItem(RATE_LIMIT_RESET_KEY);
+  } catch {
+    // Rate-limit backoff still works for the current page without storage.
+  }
+  return null;
 }
 
 function readCachedSnapshot(projectId: string): DashboardSnapshot | null {
@@ -147,6 +160,14 @@ function timeAgo(date: Date | null) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+function formatTime(timestamp: number) {
+  return new Intl.DateTimeFormat('en', {
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+  }).format(new Date(timestamp));
+}
+
 function StatCard({ label, value, note, icon, primary = false, loading = false }: { label: string; value: string; note: ReactNode; icon: ReactNode; primary?: boolean; loading?: boolean }) {
   return (
     <article className={`stat-card${primary ? ' stat-primary' : ''}${loading ? ' is-loading' : ''}`} aria-busy={loading}>
@@ -164,15 +185,47 @@ export default function Home() {
   const [projectId, setProjectId] = useState(getInitialProjectId);
   const project = useMemo(() => getProject(projectId), [projectId]);
   const [initialSnapshot] = useState(() => readCachedSnapshot(projectId));
+  const [initialRateLimitReset] = useState(readRateLimitReset);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(initialSnapshot);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'stale'>('loading');
+  const [status, setStatus] = useState<'limited' | 'loading' | 'ready' | 'stale'>(initialRateLimitReset ? 'limited' : 'loading');
   const [refreshState, setRefreshState] = useState<'idle' | 'refreshing' | 'updated' | 'error'>('idle');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => initialSnapshot ? new Date(initialSnapshot.updatedAt) : null);
+  const [rateLimitReset, setRateLimitReset] = useState<number | null>(initialRateLimitReset);
   const [range, setRange] = useState<'all' | 'recent'>('all');
   const requestSequence = useRef(0);
+  const inFlightProject = useRef<string | null>(null);
+  const rateLimitResetRef = useRef<number | null>(initialRateLimitReset);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
+    const resetAt = rateLimitResetRef.current;
+    if (resetAt && resetAt > Date.now()) {
+      setStatus('limited');
+      setRefreshState('error');
+      return;
+    }
+    if (resetAt) {
+      rateLimitResetRef.current = null;
+      setRateLimitReset(null);
+      try {
+        window.localStorage.removeItem(RATE_LIMIT_RESET_KEY);
+      } catch {
+        // Continue with the live request when storage is unavailable.
+      }
+    }
+
+    const cachedSnapshot = readCachedSnapshot(project.id);
+    const cacheAge = cachedSnapshot ? Date.now() - Date.parse(cachedSnapshot.updatedAt) : Number.POSITIVE_INFINITY;
+    if (!force && cachedSnapshot && cacheAge < REFRESH_INTERVAL_MS) {
+      setSnapshot(cachedSnapshot);
+      setLastUpdated(new Date(cachedSnapshot.updatedAt));
+      setStatus('ready');
+      setRefreshState('idle');
+      return;
+    }
+    if (inFlightProject.current === project.id) return;
+
     const requestId = ++requestSequence.current;
+    inFlightProject.current = project.id;
     setStatus('loading');
     setRefreshState('refreshing');
     try {
@@ -183,7 +236,27 @@ export default function Home() {
           'X-GitHub-Api-Version': '2022-11-28',
         },
       });
-      if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
+      if (!response.ok) {
+        const remaining = response.headers.get('X-RateLimit-Remaining');
+        if (response.status === 403 && remaining === '0') {
+          const resetSeconds = Number(response.headers.get('X-RateLimit-Reset'));
+          const parsedReset = resetSeconds * 1000;
+          const nextReset = Number.isFinite(parsedReset) && parsedReset > Date.now() ? parsedReset : Date.now() + REFRESH_INTERVAL_MS;
+          rateLimitResetRef.current = nextReset;
+          setRateLimitReset(nextReset);
+          try {
+            window.localStorage.setItem(RATE_LIMIT_RESET_KEY, String(nextReset));
+          } catch {
+            // The current page still respects the rate-limit reset.
+          }
+          if (requestId === requestSequence.current) {
+            setStatus('limited');
+            setRefreshState('error');
+          }
+          return;
+        }
+        throw new Error(`GitHub returned ${response.status}`);
+      }
       const payload = await response.json() as GitHubRelease[];
       const metrics = payload.flatMap((release) => {
         const asset = release.assets.find((candidate) => candidate.name === project.assetName);
@@ -214,14 +287,32 @@ export default function Home() {
       if (requestId !== requestSequence.current) return;
       setStatus('stale');
       setRefreshState('error');
+    } finally {
+      if (inFlightProject.current === project.id) inFlightProject.current = null;
     }
   }, [project]);
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 300_000);
+    const timer = window.setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    if (!rateLimitReset) return;
+    const delay = Math.max(0, rateLimitReset - Date.now() + 1_000);
+    const timer = window.setTimeout(() => {
+      rateLimitResetRef.current = null;
+      setRateLimitReset(null);
+      try {
+        window.localStorage.removeItem(RATE_LIMIT_RESET_KEY);
+      } catch {
+        // Continue with the automatic retry when storage is unavailable.
+      }
+      void refresh(true);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [rateLimitReset, refresh]);
 
   useEffect(() => {
     if (refreshState !== 'updated') return;
@@ -245,7 +336,7 @@ export default function Home() {
     setProjectId(nextProject.id);
     setSnapshot(cachedSnapshot);
     setLastUpdated(cachedSnapshot ? new Date(cachedSnapshot.updatedAt) : null);
-    setStatus('loading');
+    setStatus(rateLimitResetRef.current && rateLimitResetRef.current > Date.now() ? 'limited' : 'loading');
     setRefreshState('idle');
     setRange('all');
     try {
@@ -280,7 +371,11 @@ export default function Home() {
   }, [range, releases]);
   const maxDownloads = Math.max(1, ...chartReleases.map((release) => release.downloads));
   const isInitialLoad = !summary && status === 'loading';
-  const emptyNote = isInitialLoad ? 'Loading live GitHub data…' : 'GitHub data is temporarily unavailable';
+  const emptyNote = isInitialLoad
+    ? 'Loading live GitHub data…'
+    : status === 'limited'
+      ? 'GitHub rate limit reached; retry is automatic'
+      : 'GitHub data is temporarily unavailable';
   const repositoryUrl = `https://github.com/${project.owner}/${project.repo}`;
 
   return (
@@ -303,7 +398,7 @@ export default function Home() {
             <ChevronDown className="selector-chevron" size={13} aria-hidden="true" />
           </label>
           <span className={`live-pill status-${status}`}>
-            <i /> {status === 'stale' ? (summary ? 'Recent snapshot' : 'Data unavailable') : status === 'loading' ? 'Connecting…' : 'Live from GitHub'}
+            <i /> {status === 'limited' ? 'GitHub rate limit' : status === 'stale' ? (summary ? 'Recent snapshot' : 'Data unavailable') : status === 'loading' ? 'Connecting…' : 'Live from GitHub'}
           </span>
           <a className="github-button" href={repositoryUrl} target="_blank" rel="noreferrer">
             <GitBranch size={14} aria-hidden="true" /> <span className="github-label">Repository</span> <ExternalLink size={12} aria-hidden="true" />
@@ -323,15 +418,17 @@ export default function Home() {
           <button
             type="button"
             className={`refresh-button state-${refreshState}`}
-            onClick={() => void refresh()}
+            onClick={() => void refresh(true)}
             aria-label={`Refresh ${project.name} download data`}
-            disabled={refreshState === 'refreshing'}
+            disabled={refreshState === 'refreshing' || status === 'limited'}
           >
             {refreshState === 'updated'
               ? <Check size={14} aria-hidden="true" />
               : <RefreshCw size={14} className={refreshState === 'refreshing' ? 'is-spinning' : ''} aria-hidden="true" />}
             <span aria-live="polite">
-              {refreshState === 'refreshing'
+              {status === 'limited' && rateLimitReset
+                ? `Retry at ${formatTime(rateLimitReset)}`
+                : refreshState === 'refreshing'
                 ? 'Refreshing…'
                 : refreshState === 'updated'
                   ? 'Updated'
