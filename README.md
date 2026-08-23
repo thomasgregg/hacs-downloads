@@ -1,6 +1,6 @@
 # HACS Download Analytics
 
-A static, multi-repository dashboard for visualizing download activity across HACS projects. The dashboard reads release-asset statistics directly from the public GitHub API and presents totals, release trends, download share, and per-version details in a responsive interface.
+A static, multi-repository dashboard for visualizing download activity across HACS integrations and frontend cards. The dashboard reads statistics for uploaded release assets—such as integration `.zip` archives and card `.js` bundles—directly from the public GitHub API and presents totals, release trends, download share, and per-version details in a responsive interface.
 
 The project requires no backend, database, analytics service, or GitHub token. It can be hosted on GitHub Pages and configured to monitor any number of compatible public repositories.
 
@@ -9,6 +9,7 @@ The project requires no backend, database, analytics service, or GitHub token. I
 ## Features
 
 - Monitor multiple GitHub repositories from one dashboard
+- Track integration `.zip` archives and frontend card `.js` bundles
 - Switch projects with a built-in repository selector
 - Display total downloads and per-release download counts
 - Compare release performance and download distribution
@@ -20,32 +21,50 @@ The project requires no backend, database, analytics service, or GitHub token. I
 
 ## How the data is collected
 
-GitHub exposes a `download_count` for files uploaded to a release. For each configured project, the dashboard requests up to 100 published releases and finds the asset whose filename exactly matches the configured `assetName`.
+GitHub exposes a `download_count` for files uploaded to a release. For each configured project, the dashboard requests up to 100 published releases and finds the asset whose filename exactly matches the configured `assetName`. The tracking logic is asset-type agnostic: an integration archive, frontend card bundle, or another uploaded file works the same way.
 
 This means a compatible repository must:
 
 1. Be publicly accessible.
 2. Publish GitHub releases.
-3. Upload a dedicated release asset, such as an integration archive or JavaScript card, to each release.
+3. Upload a dedicated release asset, such as an integration `.zip` archive or frontend card `.js` bundle, to each release.
 4. Use a consistent asset filename across releases.
 
 GitHub's automatically generated source-code archives are not release assets and do not expose the download count used by this dashboard. Draft releases and releases without the configured asset are excluded.
 
 ## Project configuration
 
-Projects are defined in the `PROJECTS` array near the top of [`src/App.tsx`](src/App.tsx). Each object represents one repository and one release asset:
+Projects are defined in the `PROJECTS` array near the top of [`src/App.tsx`](src/App.tsx). Each object represents one repository and one release asset.
+
+For a HACS integration, set `assetName` to the exact filename of the uploaded integration archive:
 
 ```ts
 {
-  id: 'project-id',
-  name: 'Project Name',
+  id: 'example-integration',
+  name: 'Example Integration',
   owner: 'github-owner',
-  repo: 'github-repository',
-  assetName: 'release-asset.ext',
-  mark: 'PN',
-  description: 'the Project Name Home Assistant project',
+  repo: 'example-integration',
+  assetName: 'example_integration.zip',
+  mark: 'EI',
+  description: 'the Example Home Assistant integration',
 },
 ```
+
+For a HACS frontend card, set `assetName` to the exact filename of the uploaded JavaScript bundle:
+
+```ts
+{
+  id: 'example-card',
+  name: 'Example Card',
+  owner: 'github-owner',
+  repo: 'example-card',
+  assetName: 'example-card.js',
+  mark: 'EC',
+  description: 'the Example Home Assistant dashboard card',
+},
+```
+
+No separate project type is required. The dashboard looks up the configured filename in every published release and totals that asset's GitHub download count. The filename must match the uploaded asset exactly, including capitalization and extension.
 
 | Field | Purpose |
 | --- | --- |
