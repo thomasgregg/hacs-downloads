@@ -74,6 +74,15 @@ const PROJECTS: readonly ProjectConfig[] = [
     mark: 'EA',
     description: 'the ELCO Aerotop Home Assistant integration',
   },
+  {
+    id: 'intex-ha',
+    name: 'Intex SX2100',
+    owner: 'thomasgregg',
+    repo: 'intex-ha',
+    assetName: 'intex_sx2100.zip',
+    mark: 'IX',
+    description: 'the Intex SX2100 Pool Pump Home Assistant integration',
+  },
 ];
 
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
