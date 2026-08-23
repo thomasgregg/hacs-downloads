@@ -4,6 +4,8 @@ A static, multi-repository dashboard for visualizing download activity across HA
 
 The project requires no backend, database, analytics service, or GitHub token. It can be hosted on GitHub Pages and configured to monitor any number of compatible public repositories.
 
+![HACS Downloads dashboard](docs/dashboard.png)
+
 ## Features
 
 - Monitor multiple GitHub repositories from one dashboard
