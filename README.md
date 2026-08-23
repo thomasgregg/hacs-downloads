@@ -24,7 +24,7 @@ This means a compatible repository must:
 
 1. Be publicly accessible.
 2. Publish GitHub releases.
-3. Upload a dedicated release asset, such as a ZIP file, to each release.
+3. Upload a dedicated release asset, such as an integration archive or JavaScript card, to each release.
 4. Use a consistent asset filename across releases.
 
 GitHub's automatically generated source-code archives are not release assets and do not expose the download count used by this dashboard. Draft releases and releases without the configured asset are excluded.
@@ -39,9 +39,9 @@ Projects are defined in the `PROJECTS` array near the top of [`src/App.tsx`](src
   name: 'Project Name',
   owner: 'github-owner',
   repo: 'github-repository',
-  assetName: 'release-asset.zip',
+  assetName: 'release-asset.ext',
   mark: 'PN',
-  description: 'the Project Name Home Assistant integration',
+  description: 'the Project Name Home Assistant project',
 },
 ```
 

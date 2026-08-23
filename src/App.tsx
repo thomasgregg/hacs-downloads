@@ -83,6 +83,15 @@ const PROJECTS: readonly ProjectConfig[] = [
     mark: 'IX',
     description: 'the Intex SX2100 Pool Pump Home Assistant integration',
   },
+  {
+    id: 'frigate-delivery-card',
+    name: 'Frigate Delivery Card',
+    owner: 'thomasgregg',
+    repo: 'frigate-delivery-card',
+    assetName: 'frigate-delivery-card.js',
+    mark: 'FD',
+    description: 'the Frigate Delivery Home Assistant dashboard card',
+  },
 ];
 
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
@@ -419,7 +428,7 @@ export default function Home() {
         <div>
           <p className="eyebrow"><Sparkles size={13} /> Project adoption dashboard</p>
           <h1>HACS downloads,<br />made visible.</h1>
-          <p className="hero-copy">A clear, live view of ZIP downloads across every tracked release of <strong>{project.name}</strong>.</p>
+          <p className="hero-copy">A clear, live view of release asset downloads across every tracked release of <strong>{project.name}</strong>.</p>
         </div>
         <div className="hero-refresh">
           <span>Last refreshed</span>
@@ -471,7 +480,7 @@ export default function Home() {
           <div className="chart-area">
             <span className="grid-line grid-line-100" />
             <span className="grid-line grid-line-50" />
-            <div className="bar-chart" role="img" aria-label={`Bar chart showing ${project.name} ZIP downloads by release version`}>
+            <div className="bar-chart" role="img" aria-label={`Bar chart showing ${project.name} release asset downloads by version`}>
               {!summary && <div className={`data-placeholder${isInitialLoad ? ' is-loading' : ''}`}>{emptyNote}</div>}
               {chartReleases.map((release) => (
                 <a className="bar-column" href={release.url} target="_blank" rel="noreferrer" key={release.version} aria-label={`${release.version}: ${release.downloads} downloads`}>
@@ -552,7 +561,7 @@ export default function Home() {
 
       <section className="method-card">
         <Info size={18} aria-hidden="true" />
-        <div><strong>What this measures</strong><p>GitHub counts every ZIP asset download, including first installs, upgrades and redownloads. It is a useful adoption signal, but it is not a unique-user count.</p></div>
+        <div><strong>What this measures</strong><p>GitHub counts every tracked release asset download, including first installs, upgrades and redownloads. It is a useful adoption signal, but it is not a unique-user count.</p></div>
         <a href="https://docs.github.com/en/rest/releases/assets#about-release-assets" target="_blank" rel="noreferrer">Methodology <ExternalLink size={12} /></a>
       </section>
 
