@@ -478,9 +478,9 @@ export default function Home() {
             </div>
           </div>
           <div className="chart-area">
-            <span className="grid-line grid-line-100" />
-            <span className="grid-line grid-line-50" />
             <div className="bar-chart" role="img" aria-label={`Bar chart showing ${project.name} release asset downloads by version`}>
+              <span className="grid-line grid-line-100" aria-hidden="true" />
+              <span className="grid-line grid-line-50" aria-hidden="true" />
               {!summary && <div className={`data-placeholder${isInitialLoad ? ' is-loading' : ''}`}>{emptyNote}</div>}
               {chartReleases.map((release) => (
                 <a className="bar-column" href={release.url} target="_blank" rel="noreferrer" key={release.version} aria-label={`${release.version}: ${release.downloads} downloads`}>
