@@ -390,7 +390,6 @@ export default function Home() {
   }, [range, releases]);
 
   useLayoutEffect(() => {
-    if (range !== 'all') return;
     const chartArea = chartAreaRef.current;
     if (chartArea) chartArea.scrollLeft = chartArea.scrollWidth;
   }, [chartReleases.length, project.id, range]);
