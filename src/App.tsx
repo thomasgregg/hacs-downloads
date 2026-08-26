@@ -16,7 +16,7 @@ import {
   Sparkles,
   TrendingUp,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
 type ProjectConfig = {
@@ -209,10 +209,11 @@ export default function Home() {
   const [refreshState, setRefreshState] = useState<'idle' | 'refreshing' | 'updated' | 'error'>('idle');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => initialSnapshot ? new Date(initialSnapshot.updatedAt) : null);
   const [rateLimitReset, setRateLimitReset] = useState<number | null>(initialRateLimitReset);
-  const [range, setRange] = useState<'all' | 'recent'>('all');
+  const [range, setRange] = useState<'all' | 'recent'>('recent');
   const requestSequence = useRef(0);
   const inFlightProject = useRef<string | null>(null);
   const rateLimitResetRef = useRef<number | null>(initialRateLimitReset);
+  const chartAreaRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = useCallback(async (force = false) => {
     const resetAt = rateLimitResetRef.current;
@@ -387,6 +388,13 @@ export default function Home() {
     const selected = range === 'recent' ? releases.slice(0, 5) : releases;
     return [...selected].reverse();
   }, [range, releases]);
+
+  useLayoutEffect(() => {
+    if (range !== 'all') return;
+    const chartArea = chartAreaRef.current;
+    if (chartArea) chartArea.scrollLeft = chartArea.scrollWidth;
+  }, [chartReleases.length, project.id, range]);
+
   const maxDownloads = Math.max(1, ...chartReleases.map((release) => release.downloads));
   const isInitialLoad = !summary && status === 'loading';
   const emptyNote = isInitialLoad
@@ -473,11 +481,11 @@ export default function Home() {
               <h2 id="release-performance-title">Downloads by version</h2>
             </div>
             <div className="segmented-control" aria-label="Chart range">
-              <button className={range === 'all' ? 'active' : ''} onClick={() => setRange('all')} type="button">All</button>
               <button className={range === 'recent' ? 'active' : ''} onClick={() => setRange('recent')} type="button">Recent 5</button>
+              <button className={range === 'all' ? 'active' : ''} onClick={() => setRange('all')} type="button">All</button>
             </div>
           </div>
-          <div className="chart-area">
+          <div className="chart-area" ref={chartAreaRef}>
             <div className="bar-chart" role="img" aria-label={`Bar chart showing ${project.name} release asset downloads by version`}>
               <span className="grid-line grid-line-100" aria-hidden="true" />
               <span className="grid-line grid-line-50" aria-hidden="true" />
