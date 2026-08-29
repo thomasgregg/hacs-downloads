@@ -1,42 +1,72 @@
 # HACS Download Analytics
 
-A static, multi-repository dashboard for visualizing download activity across HACS integrations and frontend cards. The dashboard reads statistics for uploaded release assets—such as integration `.zip` archives and card `.js` bundles—directly from the public GitHub API and presents totals, release trends, download share, and per-version details in a responsive interface.
+[![Deploy dashboard](https://github.com/thomasgregg/hacs-downloads/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/thomasgregg/hacs-downloads/actions/workflows/deploy-pages.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 
-The project requires no backend, database, analytics service, or GitHub token. It can be hosted on GitHub Pages and configured to monitor any number of compatible public repositories.
+A fast, privacy-friendly dashboard for exploring GitHub release-asset downloads across HACS integrations and frontend cards.
 
-![HACS Downloads dashboard](docs/dashboard.png)
+HACS Download Analytics turns the download counters exposed by GitHub Releases into a clear, responsive overview of total downloads, release trends, distribution, and per-version performance. It runs entirely in the browser: no backend, database, analytics service, or GitHub token is required.
 
-## Features
+[View the live dashboard](https://thomasgregg.github.io/hacs-downloads/) · [Report an issue](https://github.com/thomasgregg/hacs-downloads/issues)
 
-- Monitor multiple GitHub repositories from one dashboard
-- Track integration `.zip` archives and frontend card `.js` bundles
-- Switch projects with a built-in repository selector
-- Display total downloads and per-release download counts
-- Compare release performance and download distribution
-- Link directly to source repositories and individual releases
-- Preserve the selected project in the URL and browser storage
-- Cache recent results locally to reduce GitHub API usage
-- Handle GitHub API rate limits with automatic retry behavior
-- Deploy automatically to GitHub Pages with GitHub Actions
+![HACS Download Analytics dashboard](docs/dashboard.png)
 
-## How the data is collected
+## Highlights
 
-GitHub exposes a `download_count` for files uploaded to a release. For each configured project, the dashboard requests up to 100 published releases and finds the asset whose filename exactly matches the configured `assetName`. The tracking logic is asset-type agnostic: an integration archive, frontend card bundle, or another uploaded file works the same way.
+- Monitor multiple public GitHub repositories from one dashboard.
+- Track integration `.zip` archives, frontend card `.js` bundles, or any consistently named release asset.
+- Review total downloads, recent performance, download share, and individual releases.
+- Switch projects without reloading and share the selected project through the URL.
+- Cache successful responses locally to reduce GitHub API usage.
+- Preserve cached data and retry automatically when GitHub rate limits are reached.
+- Deploy as a fully static site with the included GitHub Pages workflow.
 
-This means a compatible repository must:
+## How it works
 
-1. Be publicly accessible.
-2. Publish GitHub releases.
-3. Upload a dedicated release asset, such as an integration `.zip` archive or frontend card `.js` bundle, to each release.
-4. Use a consistent asset filename across releases.
+GitHub records a `download_count` for every file uploaded to a release. For each configured project, the dashboard requests up to 100 published releases, selects the asset whose filename exactly matches `assetName`, and aggregates its download count.
 
-GitHub's automatically generated source-code archives are not release assets and do not expose the download count used by this dashboard. Draft releases and releases without the configured asset are excluded.
+```text
+GitHub Releases API → matching release assets → browser-side aggregation → dashboard
+```
 
-## Project configuration
+A repository is compatible when it:
 
-Projects are defined in the `PROJECTS` array near the top of [`src/App.tsx`](src/App.tsx). Each object represents one repository and one release asset.
+1. Is publicly accessible.
+2. Publishes GitHub releases.
+3. Uploads a dedicated asset to each release.
+4. Uses a consistent, case-sensitive filename for that asset.
 
-For a HACS integration, set `assetName` to the exact filename of the uploaded integration archive:
+GitHub's automatically generated source archives are not release assets and do not expose the counter used by this dashboard. Draft releases and releases without the configured asset are ignored.
+
+## Quick start
+
+### Requirements
+
+- Node.js 22.13 or newer
+- npm
+
+### Run locally
+
+```bash
+git clone https://github.com/thomasgregg/hacs-downloads.git
+cd hacs-downloads
+npm ci
+npm run dev
+```
+
+Vite prints the local development URL in the terminal. To verify the production build:
+
+```bash
+npm run build
+npm run preview
+```
+
+The optimized site is written to `dist/`.
+
+## Configure projects
+
+Projects are defined in the `PROJECTS` array near the top of [`src/App.tsx`](src/App.tsx). Each entry connects one GitHub repository to one release asset:
 
 ```ts
 {
@@ -50,7 +80,7 @@ For a HACS integration, set `assetName` to the exact filename of the uploaded in
 },
 ```
 
-For a HACS frontend card, set `assetName` to the exact filename of the uploaded JavaScript bundle:
+Frontend cards use the same structure; only the asset filename changes:
 
 ```ts
 {
@@ -64,47 +94,27 @@ For a HACS frontend card, set `assetName` to the exact filename of the uploaded 
 },
 ```
 
-No separate project type is required. The dashboard looks up the configured filename in every published release and totals that asset's GitHub download count. The filename must match the uploaded asset exactly, including capitalization and extension.
-
-| Field | Purpose |
+| Field | Description |
 | --- | --- |
-| `id` | Unique, URL-safe identifier used in shareable links and browser cache keys. |
-| `name` | Human-readable name shown throughout the dashboard and browser title. |
-| `owner` | GitHub account or organization that owns the repository. |
-| `repo` | GitHub repository name without the owner or URL. |
-| `assetName` | Exact, case-sensitive filename of the uploaded release asset to count. |
-| `mark` | Short initials displayed in the dashboard brand mark. |
-| `description` | Project description used in the page metadata. |
+| `id` | Unique, URL-safe identifier used in links and browser cache keys. |
+| `name` | Human-readable project name shown in the interface and page title. |
+| `owner` | GitHub user or organization that owns the repository. |
+| `repo` | Repository name without the owner or URL. |
+| `assetName` | Exact, case-sensitive filename of the release asset to count. |
+| `mark` | Short initials displayed in the project mark. |
+| `description` | Project description used in page metadata. |
 
-### Add a project
+### Add, edit, or remove a project
 
-1. Confirm that the repository has at least one published release containing the asset you want to track.
-2. Add a new object to `PROJECTS` with a unique `id`.
-3. Run `npm run dev` and select the project in the dashboard.
-4. Confirm that the release totals appear and the repository and release links are correct.
-5. Commit and push the change to deploy it.
+To add a project, confirm that at least one published release contains the asset, add an entry with a unique `id`, and run the dashboard locally to verify its totals and links.
 
-The selector and all project-specific headings, labels, links, metadata, asset badges, cache entries, and shareable URLs are generated automatically from this configuration.
+Edit an existing entry to update its presentation or repository details. Avoid changing its `id` unless necessary because existing shared URLs and local cache entries use it.
 
-### Edit a project
+Remove a project by deleting its entry. If a URL references an unknown project, the dashboard safely falls back to the default project.
 
-Update the relevant object in `PROJECTS`. Changes to `name`, `owner`, `repo`, `assetName`, `mark`, or `description` take effect on the next build.
+The first entry in `PROJECTS` is the default. The selector follows the array order.
 
-Avoid changing an existing `id` unless necessary. The identifier is part of the project's shareable URL and local cache key, so changing it invalidates old links and creates a new browser cache entry.
-
-### Remove a project
-
-Delete its object from `PROJECTS`. Also check any shared links that use its `?project=<id>` parameter. If a requested project no longer exists, the dashboard falls back to the default project.
-
-### Change the default project
-
-Move the desired project to the first position in `PROJECTS`. The first entry is used when there is no valid project in the URL or browser storage.
-
-### Reorder projects
-
-Reorder the objects in `PROJECTS`. The selector follows the same order as the array.
-
-## Shareable project URLs
+## Shareable links
 
 Selecting a project updates the query string without reloading the page:
 
@@ -112,45 +122,18 @@ Selecting a project updates the query string without reloading the page:
 https://example.github.io/repository-name/?project=project-id
 ```
 
-Opening that URL selects the matching project. When no valid query parameter is present, the dashboard restores the last selection saved in the browser or uses the first configured project.
+When the query parameter is missing or invalid, the dashboard restores the most recently selected project from browser storage, then falls back to the first configured project.
 
-## Local development
+## Deployment
 
-Requirements:
-
-- Node.js 22.13 or newer
-- npm
-
-Install dependencies and start the development server:
-
-```bash
-npm ci
-npm run dev
-```
-
-Create and preview a production build:
-
-```bash
-npm run build
-npm run preview
-```
-
-The production files are written to `dist/`.
-
-## GitHub Pages deployment
-
-The workflow in [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) builds and deploys the dashboard whenever a commit is pushed to `main`. It can also be started manually from the repository's **Actions** tab.
-
-To enable deployment:
+The included [GitHub Pages workflow](.github/workflows/deploy-pages.yml) builds and deploys the dashboard after every push to `main`. It also supports manual runs from the repository's **Actions** tab.
 
 1. Open the repository on GitHub.
 2. Go to **Settings → Pages**.
 3. Set **Source** to **GitHub Actions**.
-4. Push a commit to `main` or run the deployment workflow manually.
+4. Push to `main` or run the workflow manually.
 
-### Configure the Pages path
-
-The Vite `base` value in [`vite.config.ts`](vite.config.ts) must match the GitHub Pages repository path:
+For a repository site, the `base` value in [`vite.config.ts`](vite.config.ts) must match the repository name:
 
 ```ts
 export default defineConfig({
@@ -159,32 +142,35 @@ export default defineConfig({
 });
 ```
 
-For a repository site, use `/<repository-name>/`. For a user or organization site served from the domain root, use `/`.
+Use `/` for a user or organization site served from the domain root.
 
-## Caching and GitHub API limits
+## Caching and API limits
 
-The dashboard uses the unauthenticated public GitHub API. GitHub applies a shared rate limit to requests from the same public IP address. To conserve requests, each project's latest successful response is cached in `localStorage` and reused for five minutes.
+The dashboard uses GitHub's unauthenticated public API. Each project's most recent successful response is stored in `localStorage` and reused for five minutes. If GitHub's rate limit is reached, cached data remains visible and the dashboard retries after the reset time reported by GitHub.
 
-If the limit is reached, the dashboard keeps any cached data visible, displays the retry time reported by GitHub, and retries automatically after the limit resets. No GitHub credentials are embedded in the client-side application.
+For a high-traffic deployment, use a server-side proxy with appropriate authentication and caching. Never place a GitHub access token in client-side code.
 
-For a high-traffic public deployment, consider routing requests through a small server-side proxy with appropriate caching and authentication. Do not place a GitHub access token in frontend code.
-
-## Current limitations
+## Limitations
 
 - Only public repositories are supported by the client-side implementation.
-- One exact asset filename is tracked per configured project.
-- The dashboard requests the first 100 releases returned by the GitHub API.
-- Download totals count asset downloads, not unique users or HACS installations.
-- Historic counts are GitHub's current cumulative values; the dashboard does not store time-series snapshots.
+- Each project tracks one exact asset filename.
+- The dashboard reads the first 100 releases returned by GitHub.
+- Counts represent asset downloads, not unique users or HACS installations.
+- Values are GitHub's current cumulative totals; the dashboard does not store historical snapshots.
 
 ## Technology
 
-- React
-- TypeScript
-- Vite
-- GitHub REST API
+- [React](https://react.dev/) and [TypeScript](https://www.typescriptlang.org/)
+- [Vite](https://vite.dev/)
+- [GitHub REST API](https://docs.github.com/en/rest/releases/releases)
 - GitHub Actions and GitHub Pages
+
+## Contributing
+
+Bug reports and focused pull requests are welcome. Before opening a pull request, run `npm run build` and confirm that the dashboard works at both desktop and mobile widths.
 
 ## License
 
-No license has been specified. Add a license file before redistributing or accepting third-party contributions.
+HACS Download Analytics is available under the [MIT License](LICENSE). Copyright © 2026 Thomas Gregg.
+
+This project is independent and is not affiliated with or endorsed by HACS, Home Assistant, or GitHub.
