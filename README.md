@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 
-A fast, privacy-friendly dashboard for exploring GitHub release-asset downloads across HACS integrations and frontend cards.
+A fast, privacy-friendly dashboard for exploring GitHub release-asset downloads across Home Assistant and ESPHome projects.
 
 HACS Download Analytics turns the download counters exposed by GitHub Releases into a clear, responsive overview of total downloads, release trends, distribution, and per-version performance. It runs entirely in the browser: no backend, database, analytics service, or GitHub token is required.
 
@@ -15,7 +15,7 @@ HACS Download Analytics turns the download counters exposed by GitHub Releases i
 ## Highlights
 
 - Monitor multiple public GitHub repositories from one dashboard.
-- Track integration `.zip` archives, frontend card `.js` bundles, or any consistently named release asset.
+- Track integration `.zip` archives, frontend card `.js` bundles, firmware images, or other release assets with fixed or version-derived filenames.
 - Review total downloads, recent performance, download share, and individual releases.
 - Switch projects without reloading and share the selected project through the URL.
 - Cache successful responses locally to reduce GitHub API usage.
@@ -24,7 +24,7 @@ HACS Download Analytics turns the download counters exposed by GitHub Releases i
 
 ## How it works
 
-GitHub records a `download_count` for every file uploaded to a release. For each configured project, the dashboard requests up to 100 published releases, selects the asset whose filename exactly matches `assetName`, and aggregates its download count.
+GitHub records a `download_count` for every file uploaded to a release. For each configured project, the dashboard requests up to 100 published releases, selects the asset whose filename matches either `assetName` or the version-aware `assetNameTemplate`, and aggregates its download count.
 
 ```text
 GitHub Releases API → matching release assets → browser-side aggregation → dashboard
@@ -35,7 +35,7 @@ A repository is compatible when it:
 1. Is publicly accessible.
 2. Publishes GitHub releases.
 3. Uploads a dedicated asset to each release.
-4. Uses a consistent, case-sensitive filename for that asset.
+4. Uses a consistent, case-sensitive filename or a filename derived from its release tag.
 
 GitHub's automatically generated source archives are not release assets and do not expose the counter used by this dashboard. Draft releases and releases without the configured asset are ignored.
 
@@ -94,13 +94,29 @@ Frontend cards use the same structure; only the asset filename changes:
 },
 ```
 
+Versioned assets can use `{version}`, which is the release tag with one leading
+`v` removed, or `{tag}`, which preserves the complete release tag:
+
+```ts
+{
+  id: 'example-firmware',
+  name: 'Example Firmware',
+  owner: 'github-owner',
+  repo: 'example-firmware',
+  assetNameTemplate: 'example-{version}.factory.bin',
+  mark: 'EF',
+  description: 'the Example ESPHome firmware',
+},
+```
+
 | Field | Description |
 | --- | --- |
 | `id` | Unique, URL-safe identifier used in links and browser cache keys. |
 | `name` | Human-readable project name shown in the interface and page title. |
 | `owner` | GitHub user or organization that owns the repository. |
 | `repo` | Repository name without the owner or URL. |
-| `assetName` | Exact, case-sensitive filename of the release asset to count. |
+| `assetName` | Exact, case-sensitive filename of the release asset to count. Use this or `assetNameTemplate`. |
+| `assetNameTemplate` | Case-sensitive filename template supporting `{version}` and `{tag}`. Use this or `assetName`. |
 | `mark` | Short initials displayed in the project mark. |
 | `description` | Project description used in page metadata. |
 
@@ -153,9 +169,9 @@ For a high-traffic deployment, use a server-side proxy with appropriate authenti
 ## Limitations
 
 - Only public repositories are supported by the client-side implementation.
-- Each project tracks one exact asset filename.
+- Each project tracks one exact asset filename or one filename template based on the release tag.
 - The dashboard reads the first 100 releases returned by GitHub.
-- Counts represent asset downloads, not unique users or HACS installations.
+- Counts represent GitHub release-asset downloads, not unique users or confirmed installations; downloads served elsewhere are excluded.
 - Values are GitHub's current cumulative totals; the dashboard does not store historical snapshots.
 
 ## Technology

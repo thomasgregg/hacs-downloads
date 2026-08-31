@@ -19,12 +19,15 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
-type ProjectConfig = {
+type ProjectAsset =
+  | { assetName: string; assetNameTemplate?: never }
+  | { assetName?: never; assetNameTemplate: string };
+
+type ProjectConfig = ProjectAsset & {
   id: string;
   name: string;
   owner: string;
   repo: string;
-  assetName: string;
   mark: string;
   description: string;
 };
@@ -101,6 +104,15 @@ const PROJECTS: readonly ProjectConfig[] = [
     mark: 'SW',
     description: 'the SaltWatch Home Assistant dashboard card',
   },
+  {
+    id: 'saltwatch',
+    name: 'SaltWatch Firmware',
+    owner: 'thomasgregg',
+    repo: 'saltwatch',
+    assetNameTemplate: 'saltwatch-{version}.factory.bin',
+    mark: 'SF',
+    description: 'the SaltWatch ESPHome firmware',
+  },
 ];
 
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
@@ -110,6 +122,18 @@ const REFRESH_INTERVAL_MS = 300_000;
 
 function getProject(projectId: string) {
   return PROJECTS.find((candidate) => candidate.id === projectId) ?? PROJECTS[0];
+}
+
+function resolveAssetName(project: ProjectConfig, tag: string) {
+  if (project.assetName !== undefined) return project.assetName;
+  const version = tag.replace(/^v/i, '');
+  return project.assetNameTemplate
+    .replaceAll('{tag}', tag)
+    .replaceAll('{version}', version);
+}
+
+function displayAssetName(project: ProjectConfig) {
+  return project.assetName ?? project.assetNameTemplate;
 }
 
 function getInitialProjectId() {
@@ -287,7 +311,8 @@ export default function Home() {
       }
       const payload = await response.json() as GitHubRelease[];
       const metrics = payload.flatMap((release) => {
-        const asset = release.assets.find((candidate) => candidate.name === project.assetName);
+        const expectedAssetName = resolveAssetName(project, release.tag_name);
+        const asset = release.assets.find((candidate) => candidate.name === expectedAssetName);
         if (!asset || release.draft || !release.published_at) return [];
         return [{
           version: release.tag_name,
@@ -474,8 +499,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="stats-grid" aria-label={`${project.name} download summary`}>
-        <StatCard primary loading={isInitialLoad} label="Total downloads" value={summary ? formatNumber(summary.total) : '—'} icon={<Download size={18} />} note={summary ? <>Across {releases.length} tracked releases</> : emptyNote} />
+      <section className="stats-grid" aria-label={`${project.name} release download summary`}>
+        <StatCard primary loading={isInitialLoad} label="Release downloads" value={summary ? formatNumber(summary.total) : '—'} icon={<Download size={18} />} note={summary ? <>Across {releases.length} tracked releases</> : emptyNote} />
         <StatCard loading={isInitialLoad} label="Latest release" value={summary ? formatNumber(summary.latest.downloads) : '—'} icon={<Activity size={18} />} note={summary ? <><span className="version-chip">{summary.latest.version}</span> asset downloads</> : emptyNote} />
         <StatCard loading={isInitialLoad} label="Most downloaded" value={summary ? formatNumber(summary.leader.downloads) : '—'} icon={<TrendingUp size={18} />} note={summary ? <><span className="version-chip">{summary.leader.version}</span> · {summary.leaderShare}% of total</> : emptyNote} />
         <StatCard loading={isInitialLoad} label="Active-release avg." value={summary ? formatNumber(summary.average) : '—'} icon={<BarChart3 size={18} />} note={summary ? <>Average among downloaded versions</> : emptyNote} />
@@ -486,7 +511,7 @@ export default function Home() {
           <div className="card-heading">
             <div>
               <p className="eyebrow">Release performance</p>
-              <h2 id="release-performance-title">Downloads by version</h2>
+              <h2 id="release-performance-title">Release downloads by version</h2>
             </div>
             <div className="segmented-control" aria-label="Chart range">
               <button className={range === 'recent' ? 'active' : ''} onClick={() => setRange('recent')} type="button">Recent 5</button>
@@ -516,7 +541,7 @@ export default function Home() {
           <div className="card-heading compact">
             <div>
               <p className="eyebrow">Distribution</p>
-              <h2 id="distribution-title">Download share</h2>
+              <h2 id="distribution-title">Release download share</h2>
             </div>
             <Package size={18} aria-hidden="true" />
           </div>
@@ -548,12 +573,12 @@ export default function Home() {
             <p className="eyebrow">Detailed breakdown</p>
             <h2 id="release-table-title">Tracked releases</h2>
           </div>
-          <span className="asset-pill"><Package size={13} /> {project.assetName}</span>
+          <span className="asset-pill"><Package size={13} /> {displayAssetName(project)}</span>
         </div>
         <div className="table-scroll">
           <table>
             <thead>
-              <tr><th>Version</th><th>Published</th><th>Asset size</th><th>Share</th><th className="align-right">Downloads</th><th><span className="sr-only">Open</span></th></tr>
+              <tr><th>Version</th><th>Published</th><th>Asset size</th><th>Share</th><th className="align-right">Release downloads</th><th><span className="sr-only">Open</span></th></tr>
             </thead>
             <tbody>
               {!summary && <tr className="empty-row"><td colSpan={6}>{emptyNote}</td></tr>}
@@ -577,7 +602,7 @@ export default function Home() {
 
       <section className="method-card">
         <Info size={18} aria-hidden="true" />
-        <div><strong>What this measures</strong><p>GitHub counts every tracked release asset download, including first installs, upgrades and redownloads. It is a useful adoption signal, but it is not a unique-user count.</p></div>
+        <div><strong>What this measures</strong><p>GitHub counts requests for the tracked release asset. These figures are release downloads, not unique users or confirmed installations, and they exclude files served through other channels.</p></div>
         <a href="https://docs.github.com/en/rest/releases/assets#about-release-assets" target="_blank" rel="noreferrer">Methodology <ExternalLink size={12} /></a>
       </section>
 
