@@ -92,6 +92,15 @@ const PROJECTS: readonly ProjectConfig[] = [
     mark: 'FD',
     description: 'the Frigate Delivery Home Assistant dashboard card',
   },
+  {
+    id: 'saltwatch-card',
+    name: 'SaltWatch Card',
+    owner: 'thomasgregg',
+    repo: 'saltwatch-card',
+    assetName: 'saltwatch-card.js',
+    mark: 'SW',
+    description: 'the SaltWatch Home Assistant dashboard card',
+  },
 ];
 
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
