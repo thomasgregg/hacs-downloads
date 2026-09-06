@@ -113,6 +113,15 @@ const PROJECTS: readonly ProjectConfig[] = [
     mark: 'SF',
     description: 'the SaltWatch ESPHome firmware',
   },
+  {
+    id: 'ring-view',
+    name: 'Ring View',
+    owner: 'thomasgregg',
+    repo: 'ring-view',
+    assetName: 'ring-view.js',
+    mark: 'RV',
+    description: 'the Ring View Home Assistant dashboard card',
+  },
 ];
 
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
