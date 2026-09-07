@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import projectConfigs from './projects.json';
 
 type ProjectAsset =
   | { assetName: string; assetNameTemplate?: never }
@@ -57,86 +58,45 @@ type DashboardSnapshot = {
   updatedAt: string;
 };
 
-// Add another project here once its releases include an uploaded, countable asset.
-const PROJECTS: readonly ProjectConfig[] = [
-  {
-    id: 'oralb-ha',
-    name: 'Oral-B Live',
-    owner: 'thomasgregg',
-    repo: 'oralb-ha',
-    assetName: 'oralb_live.zip',
-    mark: 'OB',
-    description: 'the Oral-B Live Home Assistant integration',
-  },
-  {
-    id: 'elco-aerotop',
-    name: 'ELCO Aerotop',
-    owner: 'thomasgregg',
-    repo: 'elco-aerotop',
-    assetName: 'elco_aerotop.zip',
-    mark: 'EA',
-    description: 'the ELCO Aerotop Home Assistant integration',
-  },
-  {
-    id: 'intex-ha',
-    name: 'Intex SX2100',
-    owner: 'thomasgregg',
-    repo: 'intex-ha',
-    assetName: 'intex_sx2100.zip',
-    mark: 'IX',
-    description: 'the Intex SX2100 Pool Pump Home Assistant integration',
-  },
-  {
-    id: 'frigate-delivery-card',
-    name: 'Frigate Delivery Card',
-    owner: 'thomasgregg',
-    repo: 'frigate-delivery-card',
-    assetName: 'frigate-delivery-card.js',
-    mark: 'FD',
-    description: 'the Frigate Delivery Home Assistant dashboard card',
-  },
-  {
-    id: 'saltwatch-card',
-    name: 'SaltWatch Card',
-    owner: 'thomasgregg',
-    repo: 'saltwatch-card',
-    assetName: 'saltwatch-card.js',
-    mark: 'SW',
-    description: 'the SaltWatch Home Assistant dashboard card',
-  },
-  {
-    id: 'saltwatch',
-    name: 'SaltWatch Firmware',
-    owner: 'thomasgregg',
-    repo: 'saltwatch',
-    assetNameTemplate: 'saltwatch-{version}.factory.bin',
-    mark: 'SF',
-    description: 'the SaltWatch ESPHome firmware',
-  },
-  {
-    id: 'ring-view',
-    name: 'Ring View',
-    owner: 'thomasgregg',
-    repo: 'ring-view',
-    assetName: 'ring-view.js',
-    mark: 'RV',
-    description: 'the Ring View Home Assistant dashboard card',
-  },
-  {
-    id: 'ring-webrtc-backend-patch',
-    name: 'Ring WebRTC Backend Patch',
-    owner: 'thomasgregg',
-    repo: 'ring-webrtc-backend-patch',
-    assetName: 'ring_webrtc_backend_patch.zip',
-    mark: 'RW',
-    description: 'the Ring WebRTC backend patch for Home Assistant',
-  },
-];
+type HistoryProjectSnapshot = {
+  total: number;
+  releases: Record<string, number>;
+};
+
+type HistorySnapshot = {
+  capturedAt: string;
+  projects: Record<string, HistoryProjectSnapshot>;
+};
+
+type DownloadHistory = {
+  schemaVersion: 1;
+  snapshots: HistorySnapshot[];
+};
+
+type GrowthDelta = {
+  absolute: number;
+  percentage: number | null;
+};
+
+type MetricGrowth = {
+  day: GrowthDelta | null;
+  week: GrowthDelta | null;
+  capturedAt: string | null;
+};
+
+type GrowthSeriesPoint = {
+  capturedAt: string;
+  label: string;
+  value: number;
+};
+
+const PROJECTS = projectConfigs as readonly ProjectConfig[];
 
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
 const LAST_PROJECT_KEY = 'hacs-downloads-selected-project-v1';
 const RATE_LIMIT_RESET_KEY = 'hacs-downloads-rate-limit-reset-v1';
 const REFRESH_INTERVAL_MS = 300_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function getProject(projectId: string) {
   return PROJECTS.find((candidate) => candidate.id === projectId) ?? PROJECTS[0];
@@ -237,7 +197,120 @@ function formatTime(timestamp: number) {
   }).format(new Date(timestamp));
 }
 
-function StatCard({ label, value, note, icon, primary = false, loading = false }: { label: string; value: string; note: ReactNode; icon: ReactNode; primary?: boolean; loading?: boolean }) {
+function isDownloadHistory(value: unknown): value is DownloadHistory {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<DownloadHistory>;
+  if (candidate.schemaVersion !== 1 || !Array.isArray(candidate.snapshots)) return false;
+  return candidate.snapshots.every((snapshot) => (
+    snapshot
+    && typeof snapshot === 'object'
+    && typeof snapshot.capturedAt === 'string'
+    && !Number.isNaN(Date.parse(snapshot.capturedAt))
+    && snapshot.projects
+    && typeof snapshot.projects === 'object'
+  ));
+}
+
+function calculateMetricGrowth(
+  history: DownloadHistory | null,
+  projectId: string,
+  getValue: (snapshot: HistoryProjectSnapshot) => number,
+): MetricGrowth {
+  const points = (history?.snapshots ?? []).flatMap((snapshot) => {
+    const projectSnapshot = snapshot.projects[projectId];
+    if (!projectSnapshot) return [];
+    const value = getValue(projectSnapshot);
+    return Number.isFinite(value) ? [{ capturedAt: snapshot.capturedAt, value }] : [];
+  }).sort((a, b) => Date.parse(a.capturedAt) - Date.parse(b.capturedAt));
+
+  const latest = points.at(-1);
+  if (!latest) return { day: null, week: null, capturedAt: null };
+  const latestTime = Date.parse(latest.capturedAt);
+
+  const calculateDelta = (days: number): GrowthDelta | null => {
+    const targetTime = latestTime - days * DAY_MS;
+    const baseline = points.slice(0, -1).reduce<(typeof points)[number] | null>((closest, point) => {
+      if (Math.abs(Date.parse(point.capturedAt) - targetTime) > 18 * 60 * 60 * 1000) return closest;
+      if (!closest) return point;
+      return Math.abs(Date.parse(point.capturedAt) - targetTime) < Math.abs(Date.parse(closest.capturedAt) - targetTime) ? point : closest;
+    }, null);
+    if (!baseline) return null;
+    const absolute = latest.value - baseline.value;
+    return {
+      absolute,
+      percentage: baseline.value > 0 ? (absolute / baseline.value) * 100 : null,
+    };
+  };
+
+  return {
+    day: calculateDelta(1),
+    week: calculateDelta(7),
+    capturedAt: latest.capturedAt,
+  };
+}
+
+function buildGrowthSeries(history: DownloadHistory | null, projectId: string, period: 'daily' | 'weekly'): GrowthSeriesPoint[] {
+  const points = (history?.snapshots ?? []).flatMap((snapshot) => {
+    const projectSnapshot = snapshot.projects[projectId];
+    return projectSnapshot ? [{ capturedAt: snapshot.capturedAt, total: projectSnapshot.total }] : [];
+  }).sort((a, b) => Date.parse(a.capturedAt) - Date.parse(b.capturedAt));
+  if (points.length < 2) return [];
+
+  const periodDays = period === 'daily' ? 1 : 7;
+  const limit = period === 'daily' ? 14 : 8;
+  const series: GrowthSeriesPoint[] = [];
+  let endpointIndex = points.length - 1;
+
+  while (endpointIndex > 0 && series.length < limit) {
+    const endpoint = points[endpointIndex];
+    const targetTime = Date.parse(endpoint.capturedAt) - periodDays * DAY_MS;
+    let baselineIndex = -1;
+    let baselineDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < endpointIndex; index += 1) {
+      const distance = Math.abs(Date.parse(points[index].capturedAt) - targetTime);
+      if (distance <= 18 * 60 * 60 * 1000 && distance < baselineDistance) {
+        baselineIndex = index;
+        baselineDistance = distance;
+      }
+    }
+    if (baselineIndex < 0) break;
+
+    const date = new Date(endpoint.capturedAt);
+    series.unshift({
+      capturedAt: endpoint.capturedAt,
+      label: new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date),
+      value: endpoint.total - points[baselineIndex].total,
+    });
+    endpointIndex = baselineIndex;
+  }
+
+  return series;
+}
+
+function formatSignedNumber(value: number) {
+  if (value === 0) return '0';
+  return `${value > 0 ? '+' : '−'}${formatNumber(Math.abs(value))}`;
+}
+
+function formatGrowthPercentage(value: number | null) {
+  if (value === null) return 'New baseline';
+  if (value === 0) return '0%';
+  const rounded = Math.abs(value) < 10 ? Math.abs(value).toFixed(1) : Math.round(Math.abs(value)).toString();
+  return `${value > 0 ? '↑' : '↓'} ${rounded}%`;
+}
+
+function GrowthCell({ label, delta, historyStatus }: { label: string; delta: GrowthDelta | null; historyStatus: 'loading' | 'ready' | 'error' }) {
+  const direction = delta ? (delta.absolute > 0 ? 'up' : delta.absolute < 0 ? 'down' : 'flat') : 'pending';
+  return (
+    <div className={`growth-cell direction-${direction}`}>
+      <span>{label}</span>
+      <strong>{delta ? formatSignedNumber(delta.absolute) : '—'}</strong>
+      <small>{delta ? formatGrowthPercentage(delta.percentage) : historyStatus === 'loading' ? 'Loading history' : historyStatus === 'error' ? 'History unavailable' : 'Collecting history'}</small>
+    </div>
+  );
+}
+
+function StatCard({ label, value, note, icon, growth, historyStatus, primary = false, loading = false }: { label: string; value: string; note: ReactNode; icon: ReactNode; growth?: MetricGrowth; historyStatus: 'loading' | 'ready' | 'error'; primary?: boolean; loading?: boolean }) {
   return (
     <article className={`stat-card${primary ? ' stat-primary' : ''}${loading ? ' is-loading' : ''}`} aria-busy={loading}>
       <div className="stat-topline">
@@ -246,6 +319,10 @@ function StatCard({ label, value, note, icon, primary = false, loading = false }
       </div>
       <strong>{value}</strong>
       <p>{note}</p>
+      {!loading && growth && <div className="growth-deltas" title={growth.capturedAt ? `Growth snapshot captured ${formatDate(growth.capturedAt)}` : 'Growth history is being collected'}>
+        <GrowthCell label="24 hours" delta={growth.day} historyStatus={historyStatus} />
+        <GrowthCell label="7 days" delta={growth.week} historyStatus={historyStatus} />
+      </div>}
     </article>
   );
 }
@@ -261,6 +338,9 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => initialSnapshot ? new Date(initialSnapshot.updatedAt) : null);
   const [rateLimitReset, setRateLimitReset] = useState<number | null>(initialRateLimitReset);
   const [range, setRange] = useState<'all' | 'recent'>('recent');
+  const [growthRange, setGrowthRange] = useState<'daily' | 'weekly'>('daily');
+  const [history, setHistory] = useState<DownloadHistory | null>(null);
+  const [historyStatus, setHistoryStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const requestSequence = useRef(0);
   const inFlightProject = useRef<string | null>(null);
   const rateLimitResetRef = useRef<number | null>(initialRateLimitReset);
@@ -370,6 +450,25 @@ export default function Home() {
   }, [refresh]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const loadHistory = async () => {
+      try {
+        const response = await fetch('download-history.json', { cache: 'no-cache', signal: controller.signal });
+        if (!response.ok) throw new Error(`History returned ${response.status}`);
+        const payload: unknown = await response.json();
+        if (!isDownloadHistory(payload)) throw new Error('History file is invalid');
+        setHistory(payload);
+        setHistoryStatus('ready');
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        setHistoryStatus('error');
+      }
+    };
+    void loadHistory();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
     if (!rateLimitReset) return;
     const delay = Math.max(0, rateLimitReset - Date.now() + 1_000);
     const timer = window.setTimeout(() => {
@@ -435,6 +534,28 @@ export default function Home() {
       average: Math.round(total / activeCount),
     };
   }, [releases]);
+
+  const metricGrowth = useMemo(() => {
+    if (!summary) return null;
+    const activeReleaseAverage = (projectSnapshot: HistoryProjectSnapshot) => {
+      const downloadedReleases = Object.values(projectSnapshot.releases).filter((downloads) => downloads > 0);
+      return downloadedReleases.length ? Math.round(projectSnapshot.total / downloadedReleases.length) : 0;
+    };
+    return {
+      total: calculateMetricGrowth(history, project.id, (projectSnapshot) => projectSnapshot.total),
+      latest: calculateMetricGrowth(history, project.id, (projectSnapshot) => projectSnapshot.releases[summary.latest.version] ?? 0),
+      leader: calculateMetricGrowth(history, project.id, (projectSnapshot) => projectSnapshot.releases[summary.leader.version] ?? 0),
+      average: calculateMetricGrowth(history, project.id, activeReleaseAverage),
+    };
+  }, [history, project.id, summary]);
+
+  const growthSeries = useMemo(() => buildGrowthSeries(history, project.id, growthRange), [growthRange, history, project.id]);
+  const maxGrowth = Math.max(1, ...growthSeries.map((point) => Math.abs(point.value)));
+  const latestGrowth = growthSeries.at(-1) ?? null;
+  const previousGrowth = growthSeries.at(-2) ?? null;
+  const growthComparison = latestGrowth && previousGrowth && previousGrowth.value > 0
+    ? ((latestGrowth.value - previousGrowth.value) / previousGrowth.value) * 100
+    : null;
 
   const chartReleases = useMemo(() => {
     const selected = range === 'recent' ? releases.slice(0, 5) : releases;
@@ -518,10 +639,49 @@ export default function Home() {
       </section>
 
       <section className="stats-grid" aria-label={`${project.name} release download summary`}>
-        <StatCard primary loading={isInitialLoad} label="Release downloads" value={summary ? formatNumber(summary.total) : '—'} icon={<Download size={18} />} note={summary ? <>Across {releases.length} tracked releases</> : emptyNote} />
-        <StatCard loading={isInitialLoad} label="Latest release" value={summary ? formatNumber(summary.latest.downloads) : '—'} icon={<Activity size={18} />} note={summary ? <><span className="version-chip">{summary.latest.version}</span> asset downloads</> : emptyNote} />
-        <StatCard loading={isInitialLoad} label="Most downloaded" value={summary ? formatNumber(summary.leader.downloads) : '—'} icon={<TrendingUp size={18} />} note={summary ? <><span className="version-chip">{summary.leader.version}</span> · {summary.leaderShare}% of total</> : emptyNote} />
-        <StatCard loading={isInitialLoad} label="Active-release avg." value={summary ? formatNumber(summary.average) : '—'} icon={<BarChart3 size={18} />} note={summary ? <>Average among downloaded versions</> : emptyNote} />
+        <StatCard primary loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.total} label="Release downloads" value={summary ? formatNumber(summary.total) : '—'} icon={<Download size={18} />} note={summary ? <>Across {releases.length} tracked releases</> : emptyNote} />
+        <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.latest} label="Latest release" value={summary ? formatNumber(summary.latest.downloads) : '—'} icon={<Activity size={18} />} note={summary ? <><span className="version-chip">{summary.latest.version}</span> asset downloads</> : emptyNote} />
+        <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.leader} label="Most downloaded" value={summary ? formatNumber(summary.leader.downloads) : '—'} icon={<TrendingUp size={18} />} note={summary ? <><span className="version-chip">{summary.leader.version}</span> · {summary.leaderShare}% of total</> : emptyNote} />
+        <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.average} label="Active-release avg." value={summary ? formatNumber(summary.average) : '—'} icon={<BarChart3 size={18} />} note={summary ? <>Average among downloaded versions</> : emptyNote} />
+      </section>
+
+      <section className="panel growth-panel" aria-labelledby="growth-title">
+        <div className="card-heading growth-heading">
+          <div>
+            <p className="eyebrow">Growth</p>
+            <h2 id="growth-title">Download velocity</h2>
+          </div>
+          <div className="segmented-control" aria-label="Growth interval">
+            <button className={growthRange === 'daily' ? 'active' : ''} onClick={() => setGrowthRange('daily')} type="button">Daily</button>
+            <button className={growthRange === 'weekly' ? 'active' : ''} onClick={() => setGrowthRange('weekly')} type="button">Weekly</button>
+          </div>
+        </div>
+        <div className="growth-layout">
+          <div className="velocity-chart" role="img" aria-label={`${growthRange === 'daily' ? 'Daily' : 'Weekly'} new downloads for ${project.name}`}>
+            {growthSeries.length === 0
+              ? <div className="growth-placeholder">
+                  <CalendarDays size={18} aria-hidden="true" />
+                  <strong>{historyStatus === 'loading' ? 'Loading growth history…' : historyStatus === 'error' ? 'Growth history is unavailable' : `Collecting ${growthRange} history`}</strong>
+                  <span>{historyStatus === 'error' ? 'Live totals remain available; growth will return when the history file can be loaded.' : growthRange === 'daily' ? 'The first daily increase appears after the next snapshot.' : 'Weekly increases appear after seven days of snapshots.'}</span>
+                </div>
+              : growthSeries.map((point, index) => (
+                <div className="velocity-column" key={point.capturedAt} aria-label={`${point.label}: ${point.value} new downloads`}>
+                  <span className="velocity-value">{formatSignedNumber(point.value)}</span>
+                  <span className="velocity-track"><i className={point.value < 0 ? 'negative' : ''} style={{ height: `${Math.max((Math.abs(point.value) / maxGrowth) * 100, 5)}%` }} /></span>
+                  <span className="velocity-label">{index % 2 === 0 || index === growthSeries.length - 1 ? point.label : ''}</span>
+                </div>
+              ))}
+          </div>
+          <aside className="growth-summary" aria-live="polite">
+            <span>Latest {growthRange === 'daily' ? '24 hours' : '7 days'}</span>
+            <strong>{latestGrowth ? formatSignedNumber(latestGrowth.value) : '—'}</strong>
+            <small>new downloads</small>
+            <div className={`growth-comparison${growthComparison !== null && growthComparison < 0 ? ' is-down' : ''}`}>
+              {growthComparison === null ? 'Waiting for a prior period' : `${formatGrowthPercentage(growthComparison)} vs prior period`}
+            </div>
+            <p>History is captured daily at approximately 04:17 UTC.</p>
+          </aside>
+        </div>
       </section>
 
       <section className="analytics-grid">

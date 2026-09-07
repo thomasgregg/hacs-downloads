@@ -8,6 +8,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "capture:history": "node scripts/capture-download-history.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview"

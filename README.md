@@ -6,7 +6,7 @@
 
 A fast, privacy-friendly dashboard for exploring GitHub release-asset downloads across Home Assistant and ESPHome projects.
 
-HACS Download Analytics turns the download counters exposed by GitHub Releases into a clear, responsive overview of total downloads, release trends, distribution, and per-version performance. It runs entirely in the browser: no backend, database, analytics service, or GitHub token is required.
+HACS Download Analytics turns the download counters exposed by GitHub Releases into a clear, responsive overview of total downloads, daily and weekly growth, distribution, and per-version performance. The site remains fully static: no database or always-on backend is required. A scheduled GitHub Action records one compact history snapshot per day.
 
 [View the live dashboard](https://thomasgregg.github.io/hacs-downloads/) · [Report an issue](https://github.com/thomasgregg/hacs-downloads/issues)
 
@@ -17,6 +17,8 @@ HACS Download Analytics turns the download counters exposed by GitHub Releases i
 - Monitor multiple public GitHub repositories from one dashboard.
 - Track integration `.zip` archives, frontend card `.js` bundles, firmware images, or other release assets with fixed or version-derived filenames.
 - Review total downloads, recent performance, download share, and individual releases.
+- Compare 24-hour and 7-day growth for totals, latest releases, leading releases, and active-release averages.
+- Explore daily and weekly download velocity as snapshot history accumulates.
 - Switch projects without reloading and share the selected project through the URL.
 - Cache successful responses locally to reduce GitHub API usage.
 - Preserve cached data and retry automatically when GitHub rate limits are reached.
@@ -28,6 +30,7 @@ GitHub records a `download_count` for every file uploaded to a release. For each
 
 ```text
 GitHub Releases API → matching release assets → browser-side aggregation → dashboard
+                    ↘ daily GitHub Action → download-history.json ↗
 ```
 
 A repository is compatible when it:
@@ -66,47 +69,47 @@ The optimized site is written to `dist/`.
 
 ## Configure projects
 
-Projects are defined in the `PROJECTS` array near the top of [`src/App.tsx`](src/App.tsx). Each entry connects one GitHub repository to one release asset:
+Projects are defined in [`src/projects.json`](src/projects.json). The dashboard and history collector share this file, so each repository only needs to be configured once. Each entry connects one GitHub repository to one release asset:
 
-```ts
+```json
 {
-  id: 'example-integration',
-  name: 'Example Integration',
-  owner: 'github-owner',
-  repo: 'example-integration',
-  assetName: 'example_integration.zip',
-  mark: 'EI',
-  description: 'the Example Home Assistant integration',
-},
+  "id": "example-integration",
+  "name": "Example Integration",
+  "owner": "github-owner",
+  "repo": "example-integration",
+  "assetName": "example_integration.zip",
+  "mark": "EI",
+  "description": "the Example Home Assistant integration"
+}
 ```
 
 Frontend cards use the same structure; only the asset filename changes:
 
-```ts
+```json
 {
-  id: 'example-card',
-  name: 'Example Card',
-  owner: 'github-owner',
-  repo: 'example-card',
-  assetName: 'example-card.js',
-  mark: 'EC',
-  description: 'the Example Home Assistant dashboard card',
-},
+  "id": "example-card",
+  "name": "Example Card",
+  "owner": "github-owner",
+  "repo": "example-card",
+  "assetName": "example-card.js",
+  "mark": "EC",
+  "description": "the Example Home Assistant dashboard card"
+}
 ```
 
 Versioned assets can use `{version}`, which is the release tag with one leading
 `v` removed, or `{tag}`, which preserves the complete release tag:
 
-```ts
+```json
 {
-  id: 'example-firmware',
-  name: 'Example Firmware',
-  owner: 'github-owner',
-  repo: 'example-firmware',
-  assetNameTemplate: 'example-{version}.factory.bin',
-  mark: 'EF',
-  description: 'the Example ESPHome firmware',
-},
+  "id": "example-firmware",
+  "name": "Example Firmware",
+  "owner": "github-owner",
+  "repo": "example-firmware",
+  "assetNameTemplate": "example-{version}.factory.bin",
+  "mark": "EF",
+  "description": "the Example ESPHome firmware"
+}
 ```
 
 | Field | Description |
@@ -128,7 +131,7 @@ Edit an existing entry to update its presentation or repository details. Avoid c
 
 Remove a project by deleting its entry. If a URL references an unknown project, the dashboard safely falls back to the default project.
 
-The first entry in `PROJECTS` is the default. The selector follows the array order.
+The first entry in `src/projects.json` is the default. The selector follows the array order.
 
 ## Shareable links
 
@@ -143,6 +146,8 @@ When the query parameter is missing or invalid, the dashboard restores the most 
 ## Deployment
 
 The included [GitHub Pages workflow](.github/workflows/deploy-pages.yml) builds and deploys the dashboard after every push to `main`. It also supports manual runs from the repository's **Actions** tab.
+
+At 04:17 UTC each day, the same workflow captures current download counters, replaces that day's entry in `public/download-history.json`, commits the updated file, and deploys the refreshed dashboard. Manual workflow runs also capture a snapshot.
 
 1. Open the repository on GitHub.
 2. Go to **Settings → Pages**.
@@ -160,7 +165,11 @@ export default defineConfig({
 
 Use `/` for a user or organization site served from the domain root.
 
-## Caching and API limits
+## Download history, caching, and API limits
+
+`public/download-history.json` keeps up to 400 days of daily snapshots. Each snapshot stores the total and per-release counters for every configured project. The dashboard calculates 24-hour and 7-day changes from snapshots taken at approximately the same UTC time.
+
+The first snapshot establishes the baseline. Daily changes become available after the second snapshot, weekly changes after seven days, and period comparisons after two complete periods. Missing intervals are shown as collecting rather than estimated.
 
 The dashboard uses GitHub's unauthenticated public API. Each project's most recent successful response is stored in `localStorage` and reused for five minutes. If GitHub's rate limit is reached, cached data remains visible and the dashboard retries after the reset time reported by GitHub.
 
@@ -172,7 +181,8 @@ For a high-traffic deployment, use a server-side proxy with appropriate authenti
 - Each project tracks one exact asset filename or one filename template based on the release tag.
 - The dashboard reads the first 100 releases returned by GitHub.
 - Counts represent GitHub release-asset downloads, not unique users or confirmed installations; downloads served elsewhere are excluded.
-- Values are GitHub's current cumulative totals; the dashboard does not store historical snapshots.
+- Live totals can be newer than the most recent daily growth snapshot.
+- Replacing or deleting a release asset can produce a negative interval because GitHub resets or removes that asset's cumulative counter.
 
 ## Technology
 
