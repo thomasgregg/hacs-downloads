@@ -122,6 +122,15 @@ const PROJECTS: readonly ProjectConfig[] = [
     mark: 'RV',
     description: 'the Ring View Home Assistant dashboard card',
   },
+  {
+    id: 'ring-webrtc-backend-patch',
+    name: 'Ring WebRTC Backend Patch',
+    owner: 'thomasgregg',
+    repo: 'ring-webrtc-backend-patch',
+    assetName: 'ring_webrtc_backend_patch.zip',
+    mark: 'RW',
+    description: 'the Ring WebRTC backend patch for Home Assistant',
+  },
 ];
 
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
