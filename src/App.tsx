@@ -508,7 +508,7 @@ export default function Home() {
     setLastUpdated(cachedSnapshot ? new Date(cachedSnapshot.updatedAt) : null);
     setStatus(rateLimitResetRef.current && rateLimitResetRef.current > Date.now() ? 'limited' : 'loading');
     setRefreshState('idle');
-    setRange('all');
+    setRange('recent');
     try {
       window.localStorage.setItem(LAST_PROJECT_KEY, nextProject.id);
       const url = new URL(window.location.href);
