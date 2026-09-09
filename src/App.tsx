@@ -16,8 +16,8 @@ import {
   Sparkles,
   TrendingUp,
 } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import projectConfigs from './projects.json';
 
 type ProjectAsset =
@@ -327,6 +327,131 @@ function StatCard({ label, value, note, icon, growth, historyStatus, primary = f
   );
 }
 
+function ProjectSelector({ project, onSelect }: { project: ProjectConfig; onSelect: (projectId: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(() => Math.max(0, PROJECTS.findIndex((candidate) => candidate.id === project.id)));
+  const selectorRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const listboxId = useId();
+  const selectedIndex = Math.max(0, PROJECTS.findIndex((candidate) => candidate.id === project.id));
+
+  const focusOption = (index: number) => {
+    const nextIndex = (index + PROJECTS.length) % PROJECTS.length;
+    setActiveIndex(nextIndex);
+    optionRefs.current[nextIndex]?.focus();
+  };
+
+  const closeMenu = (restoreFocus = false) => {
+    setIsOpen(false);
+    if (restoreFocus) window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  const openMenu = (index = selectedIndex) => {
+    setActiveIndex(index);
+    setIsOpen(true);
+  };
+
+  const chooseProject = (candidate: ProjectConfig) => {
+    if (candidate.id !== project.id) onSelect(candidate.id);
+    closeMenu(true);
+  };
+
+  const handleTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      openMenu(selectedIndex);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      openMenu(selectedIndex);
+    } else if (event.key === 'Escape' && isOpen) {
+      event.preventDefault();
+      closeMenu();
+    }
+  };
+
+  const handleOptionKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number, candidate: ProjectConfig) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusOption(index + 1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusOption(index - 1);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      focusOption(0);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      focusOption(PROJECTS.length - 1);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      chooseProject(candidate);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu(true);
+    } else if (event.key === 'Tab') {
+      setIsOpen(false);
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (isOpen) optionRefs.current[activeIndex]?.focus();
+  }, [isOpen]);
+
+  useEffect(() => {
+    setActiveIndex(selectedIndex);
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (event.target instanceof Node && !selectorRef.current?.contains(event.target)) setIsOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
+  }, [isOpen]);
+
+  return (
+    <div className={`project-selector${isOpen ? ' is-open' : ''}`} ref={selectorRef}>
+      <button
+        aria-controls={listboxId}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-label={`Tracked project: ${project.name}`}
+        className="project-selector-trigger"
+        onClick={() => isOpen ? closeMenu() : openMenu()}
+        onKeyDown={handleTriggerKeyDown}
+        ref={triggerRef}
+        type="button"
+      >
+        <Layers3 size={14} aria-hidden="true" />
+        <span>{project.name}</span>
+        <ChevronDown className="selector-chevron" size={13} aria-hidden="true" />
+      </button>
+      {isOpen && (
+        <div aria-label="Tracked project" className="project-menu" id={listboxId} role="listbox">
+          {PROJECTS.map((candidate, index) => (
+            <button
+              aria-selected={candidate.id === project.id}
+              className="project-option"
+              key={candidate.id}
+              onClick={() => chooseProject(candidate)}
+              onFocus={() => setActiveIndex(index)}
+              onKeyDown={(event) => handleOptionKeyDown(event, index, candidate)}
+              ref={(element) => { optionRefs.current[index] = element; }}
+              role="option"
+              tabIndex={index === activeIndex ? 0 : -1}
+              type="button"
+            >
+              {candidate.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [projectId, setProjectId] = useState(getInitialProjectId);
   const project = useMemo(() => getProject(projectId), [projectId]);
@@ -587,14 +712,7 @@ export default function Home() {
           </span>
         </a>
         <div className="header-actions">
-          <label className="project-selector">
-            <span className="sr-only">Tracked project</span>
-            <Layers3 size={14} aria-hidden="true" />
-            <select value={project.id} onChange={(event) => selectProject(event.target.value)}>
-              {PROJECTS.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.name}</option>)}
-            </select>
-            <ChevronDown className="selector-chevron" size={13} aria-hidden="true" />
-          </label>
+          <ProjectSelector project={project} onSelect={selectProject} />
           <span className={`live-pill status-${status}`}>
             <i /> {status === 'limited' ? 'GitHub rate limit' : status === 'stale' ? (summary ? 'Recent snapshot' : 'Data unavailable') : status === 'loading' ? 'Connecting…' : 'Live from GitHub'}
           </span>
