@@ -17,6 +17,7 @@ HACS Download Analytics turns the download counters exposed by GitHub Releases i
 - Monitor multiple public GitHub repositories from one dashboard.
 - Track integration `.zip` archives, frontend card `.js` bundles, firmware images, or other release assets with fixed or version-derived filenames.
 - Review total downloads, recent performance, download share, and individual releases.
+- See each selected repository's GitHub star count beside its repository link.
 - Compare 24-hour and 7-day growth for totals, latest releases, leading releases, and active-release averages.
 - Explore daily and weekly download velocity as snapshot history accumulates.
 - Switch projects without reloading and share the selected project through the URL.
@@ -171,7 +172,7 @@ Use `/` for a user or organization site served from the domain root.
 
 The first snapshot establishes the baseline. Daily changes become available after the second snapshot, weekly changes after seven days, and period comparisons after two complete periods. Missing intervals are shown as collecting rather than estimated.
 
-The dashboard uses GitHub's unauthenticated public API. Each project's most recent successful response is stored in `localStorage` and reused for five minutes. If GitHub's rate limit is reached, cached data remains visible and the dashboard retries after the reset time reported by GitHub.
+The dashboard uses GitHub's unauthenticated public API for release assets and public repository metadata such as the star count. Each project's most recent successful response is stored in `localStorage` and reused for five minutes. If GitHub's rate limit is reached, cached data remains visible and the dashboard retries after the reset time reported by GitHub.
 
 For a high-traffic deployment, use a server-side proxy with appropriate authentication and caching. Never place a GitHub access token in client-side code.
 

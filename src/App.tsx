@@ -14,11 +14,13 @@ import {
   Package,
   RefreshCw,
   Sparkles,
+  Star,
   TrendingUp,
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import projectConfigs from './projects.json';
+import { formatGitHubStarCount, parseGitHubStarCount } from './github';
 
 type ProjectAsset =
   | { assetName: string; assetNameTemplate?: never }
@@ -53,8 +55,13 @@ type GitHubRelease = {
   }>;
 };
 
+type GitHubRepository = {
+  stargazers_count: number;
+};
+
 type DashboardSnapshot = {
   releases: ReleaseMetric[];
+  stars?: number;
   updatedAt: string;
 };
 
@@ -147,6 +154,7 @@ function readCachedSnapshot(projectId: string): DashboardSnapshot | null {
     if (!cached) return null;
     const snapshot = JSON.parse(cached) as DashboardSnapshot;
     if (!Array.isArray(snapshot.releases) || !snapshot.releases.length || Number.isNaN(Date.parse(snapshot.updatedAt))) return null;
+    if (snapshot.stars !== undefined && parseGitHubStarCount({ stargazers_count: snapshot.stars }) === null) return null;
     const isValid = snapshot.releases.every((release) => (
       typeof release.version === 'string'
       && typeof release.downloads === 'number'
@@ -490,7 +498,7 @@ export default function Home() {
 
     const cachedSnapshot = readCachedSnapshot(project.id);
     const cacheAge = cachedSnapshot ? Date.now() - Date.parse(cachedSnapshot.updatedAt) : Number.POSITIVE_INFINITY;
-    if (!force && cachedSnapshot && cacheAge < REFRESH_INTERVAL_MS) {
+    if (!force && cachedSnapshot && cacheAge < REFRESH_INTERVAL_MS && cachedSnapshot.stars !== undefined) {
       setSnapshot(cachedSnapshot);
       setLastUpdated(new Date(cachedSnapshot.updatedAt));
       setStatus('ready');
@@ -504,13 +512,17 @@ export default function Home() {
     setStatus('loading');
     setRefreshState('refreshing');
     try {
-      const response = await fetch(`https://api.github.com/repos/${project.owner}/${project.repo}/releases?per_page=100`, {
-        cache: 'no-store',
+      const requestOptions = {
+        cache: 'no-store' as const,
         headers: {
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
         },
-      });
+      };
+      const [response, repositoryResponse] = await Promise.all([
+        fetch(`https://api.github.com/repos/${project.owner}/${project.repo}/releases?per_page=100`, requestOptions),
+        fetch(`https://api.github.com/repos/${project.owner}/${project.repo}`, requestOptions),
+      ]);
       if (!response.ok) {
         const remaining = response.headers.get('X-RateLimit-Remaining');
         if (response.status === 403 && remaining === '0') {
@@ -533,6 +545,8 @@ export default function Home() {
         throw new Error(`GitHub returned ${response.status}`);
       }
       const payload = await response.json() as GitHubRelease[];
+      const repositoryPayload: unknown = repositoryResponse.ok ? await repositoryResponse.json() as GitHubRepository : null;
+      const stars = parseGitHubStarCount(repositoryPayload) ?? cachedSnapshot?.stars;
       const metrics = payload.flatMap((release) => {
         const expectedAssetName = resolveAssetName(project, release.tag_name);
         const asset = release.assets.find((candidate) => candidate.name === expectedAssetName);
@@ -549,7 +563,7 @@ export default function Home() {
       if (requestId !== requestSequence.current) return;
 
       const updatedAt = new Date().toISOString();
-      const nextSnapshot = { releases: metrics, updatedAt };
+      const nextSnapshot = { releases: metrics, stars, updatedAt };
       setSnapshot(nextSnapshot);
       setLastUpdated(new Date(updatedAt));
       try {
@@ -700,6 +714,8 @@ export default function Home() {
       ? 'GitHub rate limit reached; retry is automatic'
       : 'GitHub data is temporarily unavailable';
   const repositoryUrl = `https://github.com/${project.owner}/${project.repo}`;
+  const stargazersUrl = `${repositoryUrl}/stargazers`;
+  const stars = snapshot?.stars;
 
   return (
     <main className="dashboard-shell" id="top">
@@ -716,9 +732,21 @@ export default function Home() {
           <span className={`live-pill status-${status}`}>
             <i /> {status === 'limited' ? 'GitHub rate limit' : status === 'stale' ? (summary ? 'Recent snapshot' : 'Data unavailable') : status === 'loading' ? 'Connecting…' : 'Live from GitHub'}
           </span>
-          <a className="github-button" href={repositoryUrl} target="_blank" rel="noreferrer">
-            <GitBranch size={14} aria-hidden="true" /> <span className="github-label">Repository</span> <ExternalLink size={12} aria-hidden="true" />
-          </a>
+          <div className="github-group" aria-label={`${project.name} GitHub links`}>
+            <a className="github-button github-repository" href={repositoryUrl} target="_blank" rel="noreferrer" aria-label={`Open ${project.name} GitHub repository`}>
+              <GitBranch size={14} aria-hidden="true" /> <span className="github-label">Repository</span> <ExternalLink className="github-external" size={12} aria-hidden="true" />
+            </a>
+            <a
+              className={`github-button github-stars${stars === undefined ? ' is-unavailable' : ''}`}
+              href={stargazersUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={stars === undefined ? `${project.name} GitHub stars unavailable` : `${formatNumber(stars)} GitHub stars for ${project.name}`}
+            >
+              <Star size={14} aria-hidden="true" />
+              <span aria-hidden="true">{stars === undefined ? '—' : formatGitHubStarCount(stars)}</span>
+            </a>
+          </div>
         </div>
       </header>
 
