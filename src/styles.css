@@ -11,12 +11,7 @@
 }
 
 * { box-sizing: border-box; }
-html {
-  max-width: 100%;
-  overflow-x: hidden;
-  overflow-x: clip;
-  scroll-behavior: smooth;
-}
+html { scroll-behavior: smooth; }
 body {
   margin: 0;
   background:
@@ -24,16 +19,12 @@ body {
     linear-gradient(180deg, #f7fafb 0, var(--canvas) 38rem);
   color: var(--ink);
   font-family: var(--font-sans);
-  max-width: 100%;
-  overflow-x: hidden;
-  overflow-x: clip;
 }
-#root { max-width: 100%; min-width: 0; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; }
 a { color: inherit; text-decoration: none; }
 
-.dashboard-shell { margin: 0 auto; max-width: 1540px; min-height: 100vh; padding: 0 clamp(20px, 5vw, 76px) 40px; width: 100%; }
+.dashboard-shell { margin: 0 auto; max-width: 1540px; min-height: 100vh; padding: 0 clamp(20px, 5vw, 76px) 40px; }
 .site-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; min-height: 88px; }
 .brand { align-items: center; display: flex; gap: 12px; }
 .brand-mark {
@@ -244,7 +235,7 @@ a { color: inherit; text-decoration: none; }
 .releases-panel { margin-top: 14px; overflow: hidden; padding: 25px 28px 12px; }
 .table-heading { align-items: center; margin-bottom: 20px; }
 .asset-pill { background: #f2f6f8; font-family: var(--font-mono); }
-.table-scroll { overflow-x: auto; }
+.table-scroll { overflow-x: auto; position: relative; }
 table { border-collapse: collapse; min-width: 760px; width: 100%; }
 th { color: #8a98a7; font-size: 9px; font-weight: 750; letter-spacing: .08em; padding: 10px 8px; text-align: left; text-transform: uppercase; }
 td { border-top: 1px solid #edf1f4; color: var(--muted); font-size: 11px; padding: 15px 8px; }
