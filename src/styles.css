@@ -11,7 +11,12 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html {
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+  scroll-behavior: smooth;
+}
 body {
   margin: 0;
   background:
@@ -19,12 +24,16 @@ body {
     linear-gradient(180deg, #f7fafb 0, var(--canvas) 38rem);
   color: var(--ink);
   font-family: var(--font-sans);
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
 }
+#root { max-width: 100%; min-width: 0; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; }
 a { color: inherit; text-decoration: none; }
 
-.dashboard-shell { margin: 0 auto; max-width: 1540px; min-height: 100vh; padding: 0 clamp(20px, 5vw, 76px) 40px; }
+.dashboard-shell { margin: 0 auto; max-width: 1540px; min-height: 100vh; padding: 0 clamp(20px, 5vw, 76px) 40px; width: 100%; }
 .site-header { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; min-height: 88px; }
 .brand { align-items: center; display: flex; gap: 12px; }
 .brand-mark {
