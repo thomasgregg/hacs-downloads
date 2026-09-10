@@ -343,8 +343,10 @@ footer { color: #8a98a7; display: flex; font-size: 9px; justify-content: space-b
   .method-card a { grid-column: 2; }
   footer { align-items: start; flex-direction: column; gap: 6px; }
 }
-@media (max-width: 400px) {
+@media (max-width: 520px) {
   .brand > span:last-child { display: none; }
+}
+@media (max-width: 400px) {
   .project-selector { flex-basis: 142px; width: 142px; }
   .stats-grid { grid-template-columns: 1fr; }
   .stat-card { min-height: 210px; }
