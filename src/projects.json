@@ -81,5 +81,23 @@
     "assetName": "ring_webrtc_backend_patch.zip",
     "mark": "RW",
     "description": "the Ring WebRTC backend patch for Home Assistant"
+  },
+  {
+    "id": "homecall",
+    "name": "HomeCall",
+    "owner": "thomasgregg",
+    "repo": "homecall",
+    "assetName": "homecall.zip",
+    "mark": "HC",
+    "description": "the HomeCall voice announcement integration for Home Assistant"
+  },
+  {
+    "id": "homecall-card",
+    "name": "HomeCall Card",
+    "owner": "thomasgregg",
+    "repo": "homecall-card",
+    "assetName": "homecall-card.js",
+    "mark": "CC",
+    "description": "the HomeCall intercom dashboard card for Home Assistant"
   }
 ]
