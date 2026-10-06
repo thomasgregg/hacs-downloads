@@ -18,7 +18,7 @@ HACS Download Analytics turns the download counters exposed by GitHub Releases i
 - Track integration `.zip` archives, frontend card `.js` bundles, firmware images, or other release assets with fixed or version-derived filenames.
 - Configure a labeled pair of assets when a project needs separate download counts, such as Factory and OTA firmware images.
 - Review combined totals, asset-level summaries, download share, and individual releases without switching dashboard views.
-- See each selected repository's GitHub star count and explore daily or weekly net star growth in the growth chart.
+- See each selected repository's GitHub star count and compare net star changes over 24 hours and 7 days in a dedicated summary card.
 - Compare 24-hour and 7-day growth for totals, latest releases, leading releases, and active-release averages.
 - Explore daily and weekly download velocity as snapshot history accumulates, with stacked asset sections for multi-asset projects.
 - Compare the latest release with the strongest earlier version, including release age and progress toward the previous combined download record.

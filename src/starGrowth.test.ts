@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGrowthSeries } from './App';
+import { buildGrowthSeries, calculateMetricGrowth } from './App';
 import { parseGitHubStarCount } from './github';
 
 const history = {
@@ -24,5 +24,18 @@ describe('star growth history', () => {
   });
   it('waits for a baseline instead of treating missing stars as zero', () => {
     expect(buildGrowthSeries({ ...history, snapshots: history.snapshots.slice(0, 2) }, 'example', 'daily', stars)).toEqual([]);
+  });
+});
+
+describe('star summary comparisons', () => {
+  it('shows the last day change without using older missing counts', () => {
+    const result = calculateMetricGrowth({ ...history, snapshots: history.snapshots.slice(0, 4) }, 'example', stars);
+    expect(result.day).toEqual({ absolute: -1, percentage: -1 / 13 * 100 });
+    expect(result.week).toBeNull();
+  });
+  it('shows the last seven days and waits when the daily baseline is missing', () => {
+    const result = calculateMetricGrowth(history, 'example', stars);
+    expect(result.week).toEqual({ absolute: -12, percentage: -100 });
+    expect(result.day).toBeNull();
   });
 });
