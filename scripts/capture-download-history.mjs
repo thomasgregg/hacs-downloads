@@ -37,6 +37,11 @@ async function fetchProject(project) {
   if (!response.ok) throw new Error(`${project.owner}/${project.repo}: GitHub returned ${response.status}`);
 
   const payload = await response.json();
+  const repositoryResponse = await fetch(`https://api.github.com/repos/${project.owner}/${project.repo}`, { headers });
+  if (!repositoryResponse.ok) throw new Error(`Repository metadata returned ${repositoryResponse.status}`);
+  const { stargazers_count: stars } = await repositoryResponse.json();
+  if (!Number.isSafeInteger(stars) || stars < 0) throw new Error('Invalid GitHub star count');
+
   const trackedAssets = projectAssets(project);
   const releaseEntries = payload.flatMap((release) => {
     if (release.draft || !release.published_at) return [];
@@ -54,11 +59,12 @@ async function fetchProject(project) {
   const releases = Object.fromEntries(releaseEntries.map(([tag, release]) => [tag, release.total]));
   const total = Object.values(releases).reduce((sum, downloads) => sum + downloads, 0);
 
-  if (!project.assets) return { total, releases };
+  if (!project.assets) return { total, releases, stars };
 
   return {
     total,
     releases,
+    stars,
     assets: Object.fromEntries(trackedAssets.map((asset) => [
       asset.id,
       releaseEntries.reduce((sum, [, release]) => sum + (release.assets[asset.id] ?? 0), 0),

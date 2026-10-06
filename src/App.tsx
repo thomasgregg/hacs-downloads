@@ -79,6 +79,7 @@ type DashboardSnapshot = {
 };
 
 type HistoryProjectSnapshot = {
+  stars?: number;
   total: number;
   releases: Record<string, number>;
   assets?: Record<string, number>;
@@ -299,7 +300,7 @@ function calculateMetricGrowth(
   };
 }
 
-function buildGrowthSeries(
+export function buildGrowthSeries(
   history: DownloadHistory | null,
   projectId: string,
   period: 'daily' | 'weekly',
@@ -541,6 +542,7 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => initialSnapshot ? new Date(initialSnapshot.updatedAt) : null);
   const [rateLimitReset, setRateLimitReset] = useState<number | null>(initialRateLimitReset);
   const [range, setRange] = useState<'all' | 'recent'>('recent');
+  const [growthMetric, setGrowthMetric] = useState<'downloads' | 'stars'>('downloads');
   const [growthRange, setGrowthRange] = useState<'daily' | 'weekly'>('daily');
   const [history, setHistory] = useState<DownloadHistory | null>(null);
   const [historyStatus, setHistoryStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -799,16 +801,18 @@ export default function Home() {
     project.id,
     growthRange,
     (projectSnapshot) => {
+      if (growthMetric === 'stars') return parseGitHubStarCount({ stargazers_count: projectSnapshot.stars }) ?? Number.NaN;
       if (!hasAssetBreakdown) return projectSnapshot.total;
       if (!projectSnapshot.assets) return Number.NaN;
       return trackedAssets.reduce((sum, asset) => sum + (projectSnapshot.assets?.[asset.id] ?? 0), 0);
     },
-    hasAssetBreakdown
+    hasAssetBreakdown && growthMetric === 'downloads'
       ? (projectSnapshot) => projectSnapshot.assets
         ? Object.fromEntries(trackedAssets.map((asset) => [asset.id, projectSnapshot.assets?.[asset.id] ?? 0]))
         : undefined
       : undefined,
-  ), [growthRange, hasAssetBreakdown, history, project.id, trackedAssets]);
+  ), [growthMetric, growthRange, hasAssetBreakdown, history, project.id, trackedAssets]);
+  const growthUnit = growthMetric === 'stars' ? 'stars' : hasAssetBreakdown ? 'tracked downloads' : 'downloads';
   const maxGrowth = Math.max(1, ...growthSeries.map((point) => Math.abs(point.value)));
   const latestGrowth = growthSeries.at(-1) ?? null;
   const previousGrowth = growthSeries.at(-2) ?? null;
@@ -940,8 +944,12 @@ export default function Home() {
         <div className="card-heading growth-heading">
           <div>
             <p className="eyebrow">Growth</p>
-            <h2 id="growth-title">Download velocity</h2>
-            {hasAssetBreakdown && secondaryAsset && <AssetLegend assets={[primaryAsset, secondaryAsset]} />}
+            <h2 id="growth-title">{growthMetric === 'stars' ? 'GitHub star growth' : 'Download velocity'}</h2>
+            {growthMetric === 'downloads' && hasAssetBreakdown && secondaryAsset && <AssetLegend assets={[primaryAsset, secondaryAsset]} />}
+          </div>
+          <div className="segmented-control" aria-label="Growth metric">
+            <button className={growthMetric === 'downloads' ? 'active' : ''} aria-pressed={growthMetric === 'downloads'} onClick={() => setGrowthMetric('downloads')} type="button">Downloads</button>
+            <button className={growthMetric === 'stars' ? 'active' : ''} aria-pressed={growthMetric === 'stars'} onClick={() => setGrowthMetric('stars')} type="button">Stars</button>
           </div>
           <div className="segmented-control" aria-label="Growth interval">
             <button className={growthRange === 'daily' ? 'active' : ''} onClick={() => setGrowthRange('daily')} type="button">Daily</button>
@@ -952,20 +960,20 @@ export default function Home() {
           <div
             className="velocity-chart"
             role="img"
-            aria-label={`${growthRange === 'daily' ? 'Daily' : 'Weekly'} new ${hasAssetBreakdown ? 'tracked downloads' : 'downloads'} for ${project.name}`}
+            aria-label={`${growthRange === 'daily' ? 'Daily' : 'Weekly'} new ${growthUnit} for ${project.name}`}
           >
             {growthSeries.length === 0
               ? <div className="growth-placeholder">
                   <CalendarDays size={18} aria-hidden="true" />
                   <strong>{historyStatus === 'loading' ? 'Loading growth history…' : historyStatus === 'error' ? 'Growth history is unavailable' : `Collecting ${growthRange} history`}</strong>
-                  <span>{historyStatus === 'error' ? 'Live totals remain available; growth will return when the history file can be loaded.' : growthRange === 'daily' ? 'The first daily increase appears after the next snapshot.' : 'Weekly increases appear after seven days of snapshots.'}</span>
+                  <span>{historyStatus === 'error' ? 'Live totals remain available; growth will return when the history file can be loaded.' : growthRange === 'daily' ? 'The first daily change appears after two snapshots containing this metric.' : 'Weekly changes appear after seven days of snapshots containing this metric.'}</span>
                 </div>
               : growthSeries.map((point, index) => {
                 const primaryDownloads = point.assets?.[primaryAsset.id] ?? 0;
                 const secondaryDownloads = secondaryAsset ? point.assets?.[secondaryAsset.id] ?? 0 : 0;
-                const showAssetStack = hasAssetBreakdown && secondaryAsset && primaryDownloads >= 0 && secondaryDownloads >= 0;
+                const showAssetStack = growthMetric === 'downloads' && hasAssetBreakdown && secondaryAsset && primaryDownloads >= 0 && secondaryDownloads >= 0;
                 return (
-                <div className="velocity-column" key={point.capturedAt} aria-label={`${point.label}: ${point.value} new ${hasAssetBreakdown ? `tracked downloads, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset?.label}` : 'downloads'}`}>
+                <div className="velocity-column" key={point.capturedAt} aria-label={`${point.label}: ${point.value} net new ${growthMetric === 'downloads' && hasAssetBreakdown ? `tracked downloads, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset?.label}` : growthUnit}`}>
                   <span className="velocity-value">{formatSignedNumber(point.value)}</span>
                   <span className="velocity-track">
                     {showAssetStack
@@ -983,8 +991,8 @@ export default function Home() {
           <aside className="growth-summary" aria-live="polite">
             <span>Latest {growthRange === 'daily' ? '24 hours' : '7 days'}</span>
             <strong>{latestGrowth ? formatSignedNumber(latestGrowth.value) : '—'}</strong>
-            <small>new {hasAssetBreakdown ? 'tracked downloads' : 'downloads'}</small>
-            {latestGrowth?.assets && hasAssetBreakdown && secondaryAsset && (
+            <small>net new {growthUnit}</small>
+            {latestGrowth?.assets && growthMetric === 'downloads' && hasAssetBreakdown && secondaryAsset && (
               <div className="growth-asset-totals">
                 <span><i className="asset-primary" />{primaryAsset.label} {formatSignedNumber(latestGrowth.assets[primaryAsset.id] ?? 0)}</span>
                 <span><i className="asset-secondary" />{secondaryAsset.label} {formatSignedNumber(latestGrowth.assets[secondaryAsset.id] ?? 0)}</span>
@@ -993,7 +1001,7 @@ export default function Home() {
             <div className={`growth-comparison${growthComparison !== null && growthComparison < 0 ? ' is-down' : ''}`}>
               {growthComparison === null ? 'Waiting for a prior period' : `${formatGrowthPercentage(growthComparison)} vs prior period`}
             </div>
-            <p>History is captured daily at approximately 04:17 UTC.</p>
+            <p>History is captured daily at approximately 04:17 UTC. Changes are net gains and may be negative.</p>
           </aside>
         </div>
       </section>

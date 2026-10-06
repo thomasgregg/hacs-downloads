@@ -187,7 +187,7 @@ a { color: inherit; text-decoration: none; }
 .growth-cell.direction-down > small { color: #b76530; }
 .growth-cell.direction-flat > small, .growth-cell.direction-pending > small { color: var(--muted); }
 .growth-panel { margin-top: 14px; padding: 25px 28px 24px; }
-.growth-heading { align-items: center; }
+.growth-heading { align-items: center; flex-wrap: wrap; gap: 12px; }
 .asset-legend { align-items: center; color: var(--muted); display: flex; flex-wrap: wrap; font-size: 9px; font-weight: 650; gap: 12px; margin-top: 8px; }
 .asset-legend span, .growth-asset-totals span { align-items: center; display: inline-flex; gap: 5px; }
 .asset-legend i, .growth-asset-totals i { border-radius: 3px; display: inline-block; height: 8px; width: 8px; }
