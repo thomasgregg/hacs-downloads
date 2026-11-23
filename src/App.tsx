@@ -228,18 +228,6 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function timeAgo(date: Date | null) {
-  if (!date) return 'Waiting for GitHub';
-  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (seconds < 10) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
 function formatTime(timestamp: number) {
   return new Intl.DateTimeFormat('en', {
     hour: '2-digit',
@@ -539,7 +527,6 @@ export default function Home() {
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(initialSnapshot);
   const [status, setStatus] = useState<'limited' | 'loading' | 'ready' | 'stale'>(initialRateLimitReset ? 'limited' : 'loading');
   const [refreshState, setRefreshState] = useState<'idle' | 'refreshing' | 'updated' | 'error'>('idle');
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(() => initialSnapshot ? new Date(initialSnapshot.updatedAt) : null);
   const [rateLimitReset, setRateLimitReset] = useState<number | null>(initialRateLimitReset);
   const [range, setRange] = useState<'all' | 'recent'>('recent');
   const [growthRange, setGrowthRange] = useState<'daily' | 'weekly'>('daily');
@@ -571,7 +558,6 @@ export default function Home() {
     const cacheAge = cachedSnapshot ? Date.now() - Date.parse(cachedSnapshot.updatedAt) : Number.POSITIVE_INFINITY;
     if (!force && cachedSnapshot && cacheAge < REFRESH_INTERVAL_MS && cachedSnapshot.stars !== undefined) {
       setSnapshot(cachedSnapshot);
-      setLastUpdated(new Date(cachedSnapshot.updatedAt));
       setStatus('ready');
       setRefreshState('idle');
       return;
@@ -643,7 +629,6 @@ export default function Home() {
       const updatedAt = new Date().toISOString();
       const nextSnapshot = { releases: metrics, stars, updatedAt };
       setSnapshot(nextSnapshot);
-      setLastUpdated(new Date(updatedAt));
       try {
         window.localStorage.setItem(snapshotCacheKey(project.id), JSON.stringify(nextSnapshot));
       } catch {
@@ -722,7 +707,6 @@ export default function Home() {
     requestSequence.current += 1;
     setProjectId(nextProject.id);
     setSnapshot(cachedSnapshot);
-    setLastUpdated(cachedSnapshot ? new Date(cachedSnapshot.updatedAt) : null);
     setStatus(rateLimitResetRef.current && rateLimitResetRef.current > Date.now() ? 'limited' : 'loading');
     setRefreshState('idle');
     setRange('recent');
@@ -863,6 +847,16 @@ export default function Home() {
   const secondaryAssetDownloads = secondaryAsset ? assetTotals[secondaryAsset.id] ?? 0 : 0;
   const primaryAssetShare = summary?.total ? Math.round((primaryAssetDownloads / summary.total) * 100) : 0;
 
+  const refreshLabel = status === 'limited' && rateLimitReset
+    ? `Retry at ${formatTime(rateLimitReset)}`
+    : refreshState === 'refreshing'
+      ? 'Refreshing…'
+      : refreshState === 'updated'
+        ? 'Updated'
+        : refreshState === 'error'
+          ? 'Try again'
+          : 'Refresh data';
+
   return (
     <main className="dashboard-shell" id="top">
       <header className="site-header">
@@ -875,6 +869,19 @@ export default function Home() {
         </a>
         <div className="header-actions">
           <ProjectSelector project={project} onSelect={selectProject} />
+          <button
+            type="button"
+            className={`refresh-button state-${refreshState}`}
+            onClick={() => void refresh(true)}
+            aria-label={`Refresh ${project.name} download data`}
+            title={refreshLabel}
+            disabled={refreshState === 'refreshing' || status === 'limited'}
+          >
+            {refreshState === 'updated'
+              ? <Check size={14} aria-hidden="true" />
+              : <RefreshCw size={14} className={refreshState === 'refreshing' ? 'is-spinning' : ''} aria-hidden="true" />}
+            <span className="refresh-label" aria-live="polite">{refreshLabel}</span>
+          </button>
           <span className={`live-pill status-${status}`}>
             <i /> {status === 'limited' ? 'GitHub rate limit' : status === 'stale' ? (summary ? 'Recent snapshot' : 'Data unavailable') : status === 'loading' ? 'Connecting…' : 'Live from GitHub'}
           </span>
@@ -897,37 +904,6 @@ export default function Home() {
       </header>
 
       <h1 className="sr-only">{project.name} download analytics</h1>
-      <div className="dashboard-toolbar">
-        <p className="dashboard-description">GitHub release downloads for Home Assistant and ESPHome projects.</p>
-        <div className="refresh-controls">
-          <span className="refresh-timestamp">
-            {lastUpdated ? <>Last refreshed <strong>{timeAgo(lastUpdated)}</strong></> : timeAgo(lastUpdated)}
-          </span>
-          <button
-            type="button"
-            className={`refresh-button state-${refreshState}`}
-            onClick={() => void refresh(true)}
-            aria-label={`Refresh ${project.name} download data`}
-            disabled={refreshState === 'refreshing' || status === 'limited'}
-          >
-            {refreshState === 'updated'
-              ? <Check size={14} aria-hidden="true" />
-              : <RefreshCw size={14} className={refreshState === 'refreshing' ? 'is-spinning' : ''} aria-hidden="true" />}
-            <span aria-live="polite">
-              {status === 'limited' && rateLimitReset
-                ? `Retry at ${formatTime(rateLimitReset)}`
-                : refreshState === 'refreshing'
-                ? 'Refreshing…'
-                : refreshState === 'updated'
-                  ? 'Updated'
-                  : refreshState === 'error'
-                    ? 'Try again'
-                    : 'Refresh data'}
-            </span>
-          </button>
-        </div>
-      </div>
-
       <section className="stats-grid" aria-label={`${project.name} download and star summary`}>
         {hasAssetBreakdown && secondaryAsset ? <>
           <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.total} label="Tracked downloads" value={summary ? formatNumber(summary.total) : '—'} icon={<Download size={18} />} note={summary ? <>Across {releases.length} tracked releases</> : emptyNote} />
