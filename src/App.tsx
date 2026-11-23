@@ -231,7 +231,7 @@ function formatDate(value: string) {
 function timeAgo(date: Date | null) {
   if (!date) return 'Waiting for GitHub';
   const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (seconds < 10) return 'Just now';
+  if (seconds < 10) return 'just now';
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
@@ -897,11 +897,12 @@ export default function Home() {
       </header>
 
       <h1 className="sr-only">{project.name} download analytics</h1>
-      <div className="hero">
-        <p className="hero-copy">GitHub release downloads for Home Assistant and ESPHome projects.</p>
-        <div className="hero-refresh">
-          <span>Last refreshed</span>
-          <strong>{timeAgo(lastUpdated)}</strong>
+      <div className="dashboard-toolbar">
+        <p className="dashboard-description">GitHub release downloads for Home Assistant and ESPHome projects.</p>
+        <div className="refresh-controls">
+          <span className="refresh-timestamp">
+            {lastUpdated ? <>Last refreshed <strong>{timeAgo(lastUpdated)}</strong></> : timeAgo(lastUpdated)}
+          </span>
           <button
             type="button"
             className={`refresh-button state-${refreshState}`}
