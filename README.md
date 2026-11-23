@@ -1,16 +1,16 @@
-# HACS Download Analytics
+# HA Download Analytics
 
 [![Deploy dashboard](https://github.com/thomasgregg/hacs-downloads/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/thomasgregg/hacs-downloads/actions/workflows/deploy-pages.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 
-A fast, privacy-friendly dashboard for exploring GitHub release-asset downloads across Home Assistant and ESPHome projects.
+GitHub release downloads for Home Assistant and ESPHome projects.
 
-HACS Download Analytics turns the download counters exposed by GitHub Releases into a clear, responsive overview of total downloads, daily and weekly growth, distribution, and per-version performance. Projects can track either one release asset or a labeled pair, with combined totals and separate asset-level results shown in the same dashboard. The site remains fully static: no database or always-on backend is required. A scheduled GitHub Action records one compact history snapshot per day.
+Formerly HACS Download Analytics. The dashboard shows total downloads, daily and weekly growth, distribution, and per-version performance. Projects can track either one release asset or a labeled pair, with combined totals and separate asset-level results shown in the same dashboard. The site remains fully static: no database or always-on backend is required. A scheduled GitHub Action records one compact history snapshot per day.
 
 [View the live dashboard](https://thomasgregg.github.io/hacs-downloads/) · [Report an issue](https://github.com/thomasgregg/hacs-downloads/issues)
 
-![HACS Download Analytics dashboard](docs/dashboard.png)
+![HA Download Analytics](public/og.png)
 
 ## Highlights
 
@@ -231,6 +231,6 @@ Bug reports and focused pull requests are welcome. Before opening a pull request
 
 ## License
 
-HACS Download Analytics is available under the [MIT License](LICENSE). Copyright © 2026 Thomas Gregg.
+HA Download Analytics is available under the [MIT License](LICENSE). Copyright © 2026 Thomas Gregg.
 
-This project is independent and is not affiliated with or endorsed by HACS, Home Assistant, or GitHub.
+This project is independent of Home Assistant and GitHub.
