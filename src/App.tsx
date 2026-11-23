@@ -71,6 +71,8 @@ type GitHubRepository = {
   stargazers_count: number;
 };
 
+type RefreshState = 'idle' | 'refreshing' | 'updated' | 'error';
+
 type DashboardSnapshot = {
   releases: ReleaseMetric[];
   stars?: number;
@@ -234,6 +236,16 @@ function formatTime(timestamp: number) {
     hour12: false,
     minute: '2-digit',
   }).format(new Date(timestamp));
+}
+
+function formatLastUpdated(updatedAt: string | undefined, now: number) {
+  if (!updatedAt) return 'Not updated yet';
+  const minutes = Math.max(0, Math.floor((now - Date.parse(updatedAt)) / 60_000));
+  if (minutes === 0) return 'Updated just now';
+  if (minutes < 60) return `Updated ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Updated ${hours}h ago`;
+  return `Updated ${Math.floor(hours / 24)}d ago`;
 }
 
 function isDownloadHistory(value: unknown): value is DownloadHistory {
@@ -519,6 +531,55 @@ function ProjectSelector({ project, onSelect }: { project: ProjectConfig; onSele
   );
 }
 
+type RefreshButtonProps = {
+  projectName: string;
+  updatedAt?: string;
+  state: RefreshState;
+  retryAt: number | null;
+  disabled: boolean;
+  onRefresh: () => void;
+};
+
+function RefreshButton({ projectName, updatedAt, state, retryAt, disabled, onRefresh }: RefreshButtonProps) {
+  const [now, setNow] = useState(Date.now);
+  const labelId = useId();
+
+  useEffect(() => {
+    if (!updatedAt) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, [updatedAt]);
+
+  const feedback = retryAt
+    ? `Retry at ${formatTime(retryAt)}`
+    : state === 'refreshing'
+      ? 'Refreshing…'
+      : state === 'error'
+        ? 'Try again'
+        : '';
+  const label = feedback || formatLastUpdated(updatedAt, now);
+
+  return (
+    <>
+      <button
+        type="button"
+        className={`refresh-button state-${state}`}
+        onClick={onRefresh}
+        aria-label={`Refresh ${projectName} download data`}
+        aria-describedby={labelId}
+        title={label}
+        disabled={disabled}
+      >
+        {state === 'updated'
+          ? <Check size={14} aria-hidden="true" />
+          : <RefreshCw size={14} className={state === 'refreshing' ? 'is-spinning' : ''} aria-hidden="true" />}
+        <span className="refresh-label" id={labelId}>{label}</span>
+      </button>
+      <span className="sr-only" role="status">{feedback || (state === 'updated' ? 'Data updated' : '')}</span>
+    </>
+  );
+}
+
 export default function Home() {
   const [projectId, setProjectId] = useState(getInitialProjectId);
   const project = useMemo(() => getProject(projectId), [projectId]);
@@ -526,7 +587,7 @@ export default function Home() {
   const [initialRateLimitReset] = useState(readRateLimitReset);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(initialSnapshot);
   const [status, setStatus] = useState<'limited' | 'loading' | 'ready' | 'stale'>(initialRateLimitReset ? 'limited' : 'loading');
-  const [refreshState, setRefreshState] = useState<'idle' | 'refreshing' | 'updated' | 'error'>('idle');
+  const [refreshState, setRefreshState] = useState<RefreshState>('idle');
   const [rateLimitReset, setRateLimitReset] = useState<number | null>(initialRateLimitReset);
   const [range, setRange] = useState<'all' | 'recent'>('recent');
   const [growthRange, setGrowthRange] = useState<'daily' | 'weekly'>('daily');
@@ -847,16 +908,6 @@ export default function Home() {
   const secondaryAssetDownloads = secondaryAsset ? assetTotals[secondaryAsset.id] ?? 0 : 0;
   const primaryAssetShare = summary?.total ? Math.round((primaryAssetDownloads / summary.total) * 100) : 0;
 
-  const refreshLabel = status === 'limited' && rateLimitReset
-    ? `Retry at ${formatTime(rateLimitReset)}`
-    : refreshState === 'refreshing'
-      ? 'Refreshing…'
-      : refreshState === 'updated'
-        ? 'Updated'
-        : refreshState === 'error'
-          ? 'Try again'
-          : 'Refresh data';
-
   return (
     <main className="dashboard-shell" id="top">
       <header className="site-header">
@@ -887,19 +938,14 @@ export default function Home() {
               <span aria-hidden="true">{stars === undefined ? '—' : formatGitHubStarCount(stars)}</span>
             </a>
           </div>
-          <button
-            type="button"
-            className={`refresh-button state-${refreshState}`}
-            onClick={() => void refresh(true)}
-            aria-label={`Refresh ${project.name} download data`}
-            title={refreshLabel}
-            disabled={refreshState === 'refreshing' || status === 'limited'}
-          >
-            {refreshState === 'updated'
-              ? <Check size={14} aria-hidden="true" />
-              : <RefreshCw size={14} className={refreshState === 'refreshing' ? 'is-spinning' : ''} aria-hidden="true" />}
-            <span className="refresh-label" aria-live="polite">{refreshLabel}</span>
-          </button>
+          <RefreshButton
+            projectName={project.name}
+            updatedAt={snapshot?.updatedAt}
+            state={refreshState}
+            retryAt={status === 'limited' ? rateLimitReset : null}
+            disabled={status === 'limited' || refreshState === 'refreshing'}
+            onRefresh={() => void refresh(true)}
+          />
         </div>
       </header>
 
