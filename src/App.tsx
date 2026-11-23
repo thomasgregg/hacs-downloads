@@ -896,11 +896,9 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="hero">
-        <div>
-          <h1>{APP_NAME}</h1>
-          <p className="hero-copy">GitHub release downloads for Home Assistant and ESPHome projects.</p>
-        </div>
+      <h1 className="sr-only">{project.name} download analytics</h1>
+      <div className="hero">
+        <p className="hero-copy">GitHub release downloads for Home Assistant and ESPHome projects.</p>
         <div className="hero-refresh">
           <span>Last refreshed</span>
           <strong>{timeAgo(lastUpdated)}</strong>
@@ -927,7 +925,7 @@ export default function Home() {
             </span>
           </button>
         </div>
-      </section>
+      </div>
 
       <section className="stats-grid" aria-label={`${project.name} download and star summary`}>
         {hasAssetBreakdown && secondaryAsset ? <>
