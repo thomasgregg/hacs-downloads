@@ -869,19 +869,6 @@ export default function Home() {
         </a>
         <div className="header-actions">
           <ProjectSelector project={project} onSelect={selectProject} />
-          <button
-            type="button"
-            className={`refresh-button state-${refreshState}`}
-            onClick={() => void refresh(true)}
-            aria-label={`Refresh ${project.name} download data`}
-            title={refreshLabel}
-            disabled={refreshState === 'refreshing' || status === 'limited'}
-          >
-            {refreshState === 'updated'
-              ? <Check size={14} aria-hidden="true" />
-              : <RefreshCw size={14} className={refreshState === 'refreshing' ? 'is-spinning' : ''} aria-hidden="true" />}
-            <span className="refresh-label" aria-live="polite">{refreshLabel}</span>
-          </button>
           <span className={`live-pill status-${status}`}>
             <i /> {status === 'limited' ? 'GitHub rate limit' : status === 'stale' ? (summary ? 'Recent snapshot' : 'Data unavailable') : status === 'loading' ? 'Connecting…' : 'Live from GitHub'}
           </span>
@@ -900,6 +887,19 @@ export default function Home() {
               <span aria-hidden="true">{stars === undefined ? '—' : formatGitHubStarCount(stars)}</span>
             </a>
           </div>
+          <button
+            type="button"
+            className={`refresh-button state-${refreshState}`}
+            onClick={() => void refresh(true)}
+            aria-label={`Refresh ${project.name} download data`}
+            title={refreshLabel}
+            disabled={refreshState === 'refreshing' || status === 'limited'}
+          >
+            {refreshState === 'updated'
+              ? <Check size={14} aria-hidden="true" />
+              : <RefreshCw size={14} className={refreshState === 'refreshing' ? 'is-spinning' : ''} aria-hidden="true" />}
+            <span className="refresh-label" aria-live="polite">{refreshLabel}</span>
+          </button>
         </div>
       </header>
 
