@@ -13,7 +13,6 @@ import {
   Layers3,
   Package,
   RefreshCw,
-  Sparkles,
   Star,
   TrendingUp,
 } from 'lucide-react';
@@ -123,6 +122,7 @@ type GrowthHistoryPoint = {
 const PROJECTS = projectConfigs as readonly ProjectConfig[];
 
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
+const APP_NAME = 'HA Download Analytics';
 const LAST_PROJECT_KEY = 'hacs-downloads-selected-project-v1';
 const RATE_LIMIT_RESET_KEY = 'hacs-downloads-rate-limit-reset-v1';
 const REFRESH_INTERVAL_MS = 300_000;
@@ -708,7 +708,7 @@ export default function Home() {
   }, [refreshState]);
 
   useEffect(() => {
-    const title = `${project.name} · HACS Download Analytics`;
+    const title = `${project.name} · ${APP_NAME}`;
     const description = `Live GitHub release download analytics for ${project.description}.`;
     document.title = title;
     document.querySelector('meta[name="description"]')?.setAttribute('content', description);
@@ -866,10 +866,10 @@ export default function Home() {
   return (
     <main className="dashboard-shell" id="top">
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="HACS Downloads analytics home">
+        <a className="brand" href="#top" aria-label={`${APP_NAME} home`}>
           <span className="brand-mark" aria-hidden="true">{project.mark}</span>
           <span>
-            <strong>HACS Downloads</strong>
+            <strong>{APP_NAME}</strong>
             <small>{project.name} analytics</small>
           </span>
         </a>
@@ -898,9 +898,8 @@ export default function Home() {
 
       <section className="hero">
         <div>
-          <p className="eyebrow"><Sparkles size={13} /> Project adoption dashboard</p>
-          <h1>HACS downloads,<br />made visible.</h1>
-          <p className="hero-copy">A clear, live view of release asset downloads across every tracked release of <strong>{project.name}</strong>.</p>
+          <h1>{APP_NAME}</h1>
+          <p className="hero-copy">GitHub release downloads for Home Assistant and ESPHome projects.</p>
         </div>
         <div className="hero-refresh">
           <span>Last refreshed</span>
@@ -1193,7 +1192,7 @@ export default function Home() {
       </section>
 
       <footer>
-        <span>HACS Downloads · {project.name}</span>
+        <span>{APP_NAME} · {project.name}</span>
         <span>Data refreshes automatically every 5 minutes</span>
       </footer>
     </main>
